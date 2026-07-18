@@ -1,0 +1,114 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum SchoolStatus {
+  ACTIVE
+  SUSPENDED
+
+  @@map("school_status")
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+
+  @@map("user_status")
+}
+
+/// Global — tenant registry. Never scoped by RLS/tenant middleware.
+model School {
+  id            String       @id @default(uuid())
+  name          String
+  slug          String       @unique
+  subdomain     String       @unique
+  logoUrl       String?      @map("logo_url")
+  timezone      String       @default("UTC")
+  localeDefault String       @default("en") @map("locale_default")
+  status        SchoolStatus @default(ACTIVE)
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+
+  users User[]
+  roles Role[]
+
+  @@map("schools")
+}
+
+/// Tenant-scoped. Single auth identity for every human in a school.
+model User {
+  id           String     @id @default(uuid())
+  schoolId     String     @map("school_id")
+  school       School     @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  email        String?
+  civilId      String?    @map("civil_id")
+  passwordHash String     @map("password_hash")
+  phone        String?
+  status       UserStatus @default(ACTIVE)
+  locale       String     @default("en")
+  lastLoginAt  DateTime?  @map("last_login_at")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+
+  userRoles UserRole[]
+
+  @@unique([schoolId, email])
+  @@unique([schoolId, civilId])
+  @@index([schoolId])
+  @@map("users")
+}
+
+/// Tenant-scoped, but schoolId is nullable: null = platform default role, cloneable per school.
+model Role {
+  id              String   @id @default(uuid())
+  schoolId        String?  @map("school_id")
+  school          School?  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  name            String
+  isSystemDefault Boolean  @default(false) @map("is_system_default")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  rolePermissions RolePermission[]
+  userRoles       UserRole[]
+
+  @@index([schoolId])
+  @@map("roles")
+}
+
+/// Global — permission catalog is the same across every tenant.
+model Permission {
+  id          String  @id @default(uuid())
+  key         String  @unique
+  module      String
+  description String?
+
+  rolePermissions RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String @map("role_id")
+  permissionId String @map("permission_id")
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model UserRole {
+  userId String @map("user_id")
+  roleId String @map("role_id")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}

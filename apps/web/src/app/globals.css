@@ -1,0 +1,85 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #faf8ff;
+  --foreground: #191b23;
+
+  --card: #ffffff;
+  --card-foreground: #191b23;
+
+  --popover: #f3f3fe;
+  --popover-foreground: #191b23;
+
+  --primary: #004ac6;
+  --primary-foreground: #ffffff;
+
+  --secondary: #4b41e1;
+  --secondary-foreground: #ffffff;
+
+  --tertiary: #943700;
+  --tertiary-foreground: #ffffff;
+
+  --muted: #ededf9;
+  --muted-foreground: #434655;
+
+  --accent: #e7e7f3;
+  --accent-foreground: #191b23;
+
+  --destructive: #ba1a1a;
+  --destructive-foreground: #ffffff;
+
+  --border: #c3c6d7;
+  --input: #c3c6d7;
+  --ring: #0053db;
+
+  --radius: 0.5rem;
+}
+
+.dark {
+  --background: #0b0e14;
+  --foreground: #f0f0fb;
+
+  --card: #161b22;
+  --card-foreground: #f0f0fb;
+
+  --popover: #1b212b;
+  --popover-foreground: #f0f0fb;
+
+  --primary: #b4c5ff;
+  --primary-foreground: #00174b;
+
+  --secondary: #c3c0ff;
+  --secondary-foreground: #0f0069;
+
+  --tertiary: #ffb596;
+  --tertiary-foreground: #360f00;
+
+  --muted: #21262f;
+  --muted-foreground: #c3c6d7;
+
+  --accent: #262c37;
+  --accent-foreground: #f0f0fb;
+
+  --destructive: #ffb4ab;
+  --destructive-foreground: #690005;
+
+  --border: #343947;
+  --input: #343947;
+  --ring: #b4c5ff;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Logical properties by default so RTL/LTR mirror automatically per DESIGN.md */
+[dir='rtl'] {
+  text-align: right;
+}
