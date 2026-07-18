@@ -107,29 +107,31 @@ export function DataTable<T>({
         </table>
       </div>
 
-      {pageCount > 1 && (
+      {filtered.length > 0 && (
         <div className="flex items-center justify-between text-sm text-muted-foreground">
           <span>
-            Page {page + 1} of {pageCount}
+            Showing {page * PAGE_SIZE + 1}-{Math.min(filtered.length, (page + 1) * PAGE_SIZE)} of {filtered.length}
           </span>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              disabled={page === 0}
-              onClick={() => setPage((p) => p - 1)}
-              className="cursor-pointer rounded-md border border-border px-sm py-1 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Previous
-            </button>
-            <button
-              type="button"
-              disabled={page >= pageCount - 1}
-              onClick={() => setPage((p) => p + 1)}
-              className="cursor-pointer rounded-md border border-border px-sm py-1 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Next
-            </button>
-          </div>
+          {pageCount > 1 && (
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={page === 0}
+                onClick={() => setPage((p) => p - 1)}
+                className="cursor-pointer rounded border border-border px-sm py-1 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                disabled={page >= pageCount - 1}
+                onClick={() => setPage((p) => p + 1)}
+                className="cursor-pointer rounded border border-border px-sm py-1 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Next
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

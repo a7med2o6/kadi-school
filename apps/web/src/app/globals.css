@@ -3,38 +3,41 @@
 @tailwind utilities;
 
 :root {
-  --background: #faf8ff;
-  --foreground: #191b23;
+  --background: #f5f6fa;
+  --foreground: #15171f;
 
   --card: #ffffff;
-  --card-foreground: #191b23;
+  --card-foreground: #15171f;
 
-  --popover: #f3f3fe;
-  --popover-foreground: #191b23;
+  --popover: #ffffff;
+  --popover-foreground: #15171f;
 
-  --primary: #004ac6;
+  --primary: #2563eb;
   --primary-foreground: #ffffff;
 
-  --secondary: #4b41e1;
+  --secondary: #4f46e5;
   --secondary-foreground: #ffffff;
 
-  --tertiary: #943700;
+  --tertiary: #c2410c;
   --tertiary-foreground: #ffffff;
 
-  --muted: #ededf9;
-  --muted-foreground: #434655;
+  --muted: #f0f1f6;
+  --muted-foreground: #5b5f70;
 
-  --accent: #e7e7f3;
-  --accent-foreground: #191b23;
+  --accent: #e9eaf2;
+  --accent-foreground: #15171f;
 
-  --destructive: #ba1a1a;
+  --success: #16a34a;
+  --success-foreground: #ffffff;
+
+  --destructive: #dc2626;
   --destructive-foreground: #ffffff;
 
-  --border: #c3c6d7;
-  --input: #c3c6d7;
-  --ring: #0053db;
+  --border: #e2e4ec;
+  --input: #e2e4ec;
+  --ring: #2563eb;
 
-  --radius: 0.5rem;
+  --radius: 0.625rem;
 }
 
 .dark {
@@ -47,14 +50,14 @@
   --popover: #1b212b;
   --popover-foreground: #f0f0fb;
 
-  --primary: #b4c5ff;
+  --primary: #a5c4ff;
   --primary-foreground: #00174b;
 
-  --secondary: #c3c0ff;
-  --secondary-foreground: #0f0069;
+  --secondary: #c2c1ff;
+  --secondary-foreground: #1e1a5e;
 
-  --tertiary: #ffb596;
-  --tertiary-foreground: #360f00;
+  --tertiary: #ffb787;
+  --tertiary-foreground: #3a1400;
 
   --muted: #21262f;
   --muted-foreground: #c3c6d7;
@@ -62,12 +65,15 @@
   --accent: #262c37;
   --accent-foreground: #f0f0fb;
 
+  --success: #86efac;
+  --success-foreground: #052e12;
+
   --destructive: #ffb4ab;
   --destructive-foreground: #690005;
 
   --border: #343947;
   --input: #343947;
-  --ring: #b4c5ff;
+  --ring: #a5c4ff;
 }
 
 @layer base {

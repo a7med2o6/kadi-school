@@ -4,7 +4,11 @@ import { PrismaService } from '../prisma/prisma.service';
 import { SAFE_USER_FIELDS } from '../prisma/safe-user-select';
 import type { CreateStudentDto, UpdateStudentDto } from './dto/student.dto';
 
-const INCLUDE = { user: { select: SAFE_USER_FIELDS }, class: true } as const;
+const INCLUDE = {
+  user: { select: SAFE_USER_FIELDS },
+  class: true,
+  guardians: { include: { parent: { include: { user: { select: SAFE_USER_FIELDS } } } } },
+} as const;
 
 @Injectable()
 export class StudentsService {

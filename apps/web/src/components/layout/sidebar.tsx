@@ -1,8 +1,19 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { CalendarDays, GraduationCap, LayoutDashboard, School, UsersRound, BookOpen, Users } from 'lucide-react';
+import { useRouter, usePathname } from 'next/navigation';
+import {
+  CalendarDays,
+  GraduationCap,
+  LayoutDashboard,
+  LogOut,
+  School,
+  Settings,
+  UsersRound,
+  BookOpen,
+  Users,
+} from 'lucide-react';
+import { apiClient } from '@/lib/api-client';
 import { useAuthStore } from '@/stores/auth-store';
 
 interface NavItem {
@@ -22,15 +33,44 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/users', label: 'Users', icon: Users, permission: 'users:read' },
 ];
 
+function initials(label: string) {
+  return label
+    .split(/[\s@.]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase())
+    .join('');
+}
+
 export function Sidebar() {
+  const router = useRouter();
   const pathname = usePathname();
-  const permissions = useAuthStore((s) => s.user?.permissions ?? []);
+  const user = useAuthStore((s) => s.user);
+  const clear = useAuthStore((s) => s.clear);
+  const permissions = user?.permissions ?? [];
 
   const items = NAV_ITEMS.filter((item) => !item.permission || permissions.includes(item.permission));
+  const identity = user?.email ?? user?.civilId ?? '';
+  const role = user?.roles[0] ?? 'User';
+
+  async function handleLogout() {
+    await apiClient.post('/auth/logout').catch(() => undefined);
+    clear();
+    router.push('/login');
+  }
 
   return (
-    <aside className="flex h-screen w-56 flex-col border-r border-border bg-card">
-      <div className="px-md py-lg text-lg font-semibold text-foreground">Kadi School</div>
+    <aside className="flex h-screen w-64 flex-col bg-card">
+      <div className="flex items-center gap-2 px-lg py-lg">
+        <span className="flex h-10 w-10 items-center justify-center rounded-md bg-primary text-primary-foreground">
+          <GraduationCap className="h-6 w-6" />
+        </span>
+        <div>
+          <div className="text-base font-bold leading-tight text-foreground">Kadi School</div>
+          <div className="text-xs font-medium tracking-wide text-muted-foreground">ADMIN PORTAL</div>
+        </div>
+      </div>
+
       <nav className="flex flex-1 flex-col gap-1 px-sm">
         {items.map((item) => {
           const isActive = pathname === item.href;
@@ -39,9 +79,9 @@ export function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center gap-2 rounded-md px-md py-sm text-sm transition-colors ${
+              className={`flex items-center gap-2 rounded px-md py-sm text-sm transition-colors ${
                 isActive
-                  ? 'bg-accent font-medium text-accent-foreground'
+                  ? 'bg-secondary font-medium text-secondary-foreground'
                   : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
               }`}
             >
@@ -50,7 +90,39 @@ export function Sidebar() {
             </Link>
           );
         })}
+
+        <div className="my-sm border-t border-border" />
+
+        <Link
+          href="/settings"
+          className={`flex items-center gap-2 rounded px-md py-sm text-sm transition-colors ${
+            pathname === '/settings'
+              ? 'bg-secondary font-medium text-secondary-foreground'
+              : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+          }`}
+        >
+          <Settings className="h-4 w-4" />
+          Settings
+        </Link>
       </nav>
+
+      <div className="m-sm flex items-center gap-2 rounded bg-muted p-sm">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+          {initials(identity) || 'U'}
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-sm font-medium text-foreground">{identity}</div>
+          <div className="truncate text-xs text-muted-foreground">{role}</div>
+        </div>
+        <button
+          type="button"
+          onClick={handleLogout}
+          aria-label="Logout"
+          className="cursor-pointer rounded p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-destructive"
+        >
+          <LogOut className="h-4 w-4" />
+        </button>
+      </div>
     </aside>
   );
 }

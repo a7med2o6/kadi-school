@@ -54,13 +54,17 @@ const config: Config = {
           DEFAULT: 'var(--destructive)',
           foreground: 'var(--destructive-foreground)',
         },
+        success: {
+          DEFAULT: 'var(--success)',
+          foreground: 'var(--success-foreground)',
+        },
       },
       borderRadius: {
-        sm: '0.25rem',
+        sm: '0.375rem',
         DEFAULT: 'var(--radius)',
-        md: '0.75rem',
-        lg: '1rem',
-        xl: '1.5rem',
+        md: '0.875rem',
+        lg: '1.25rem',
+        xl: '1.75rem',
       },
       spacing: {
         xs: '4px',
@@ -72,7 +76,7 @@ const config: Config = {
         '3xl': '64px',
       },
       boxShadow: {
-        ambient: '0px 4px 20px rgba(0,0,0,0.03)',
+        ambient: '0px 4px 20px rgba(0,0,0,0.04)',
       },
     },
   },

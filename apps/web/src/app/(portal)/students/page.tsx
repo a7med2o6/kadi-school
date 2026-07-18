@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -16,12 +17,17 @@ interface SchoolClass {
   id: string;
   name: string;
 }
+interface Guardian {
+  relationship: string;
+  parent: { user: { email: string | null; phone: string | null } };
+}
 interface Student {
   id: string;
   admissionNumber: string;
   status: string;
   class: SchoolClass | null;
-  user: { email: string | null; civilId: string | null };
+  user: { email: string | null; civilId: string | null; phone: string | null };
+  guardians: Guardian[];
 }
 
 const studentSchema = z.object({
@@ -32,6 +38,15 @@ const studentSchema = z.object({
   classId: z.string().optional(),
 });
 type StudentInput = z.infer<typeof studentSchema>;
+
+function initials(label: string) {
+  return label
+    .split(/[\s@.]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase())
+    .join('');
+}
 
 export default function StudentsPage() {
   const queryClient = useQueryClient();
@@ -69,29 +84,71 @@ export default function StudentsPage() {
   });
 
   const columns: DataTableColumn<Student>[] = [
-    { key: 'admissionNumber', label: 'Admission #', render: (r) => r.admissionNumber },
-    { key: 'civilId', label: 'Civil ID', render: (r) => r.user.civilId ?? '—' },
-    { key: 'email', label: 'Email', render: (r) => r.user.email ?? '—' },
-    { key: 'class', label: 'Class', render: (r) => r.class?.name ?? 'Unassigned' },
+    {
+      key: 'name',
+      label: 'Name',
+      render: (r) => {
+        const label = r.user.email ?? r.user.civilId ?? r.admissionNumber;
+        return (
+          <Link href={`/students/${r.id}`} className="flex items-center gap-sm hover:opacity-80">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+              {initials(label)}
+            </span>
+            <span>
+              <span className="block font-medium text-foreground">{label}</span>
+              <span className="block text-xs text-muted-foreground">{r.user.civilId ?? r.admissionNumber}</span>
+            </span>
+          </Link>
+        );
+      },
+    },
+    { key: 'admissionNumber', label: 'Student ID', render: (r) => r.admissionNumber },
+    {
+      key: 'class',
+      label: 'Class',
+      render: (r) => (
+        <span className="rounded-full bg-muted px-sm py-0.5 text-xs font-medium text-muted-foreground">
+          {r.class?.name ?? 'Unassigned'}
+        </span>
+      ),
+    },
     {
       key: 'status',
       label: 'Status',
       render: (r) => (
         <span
-          className={`rounded-full px-sm py-0.5 text-xs font-medium ${
-            r.status === 'ACTIVE' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+          className={`inline-flex items-center gap-1 rounded-full px-sm py-0.5 text-xs font-medium ${
+            r.status === 'ACTIVE' ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'
           }`}
         >
-          {r.status}
+          <span className={`h-1.5 w-1.5 rounded-full ${r.status === 'ACTIVE' ? 'bg-success' : 'bg-destructive'}`} />
+          {r.status === 'ACTIVE' ? 'Active' : r.status}
         </span>
       ),
+    },
+    {
+      key: 'guardian',
+      label: 'Parent Contact',
+      render: (r) => {
+        const guardian = r.guardians[0];
+        if (!guardian) return <span className="text-muted-foreground">—</span>;
+        return (
+          <span>
+            <span className="block text-foreground">{guardian.parent.user.phone ?? guardian.parent.user.email}</span>
+            <span className="block text-xs uppercase text-muted-foreground">{guardian.relationship}</span>
+          </span>
+        );
+      },
     },
   ];
 
   return (
     <div className="space-y-lg">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Students</h1>
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Students</h1>
+          <p className="text-sm text-muted-foreground">Manage your student body and academic records</p>
+        </div>
         {canWrite && (
           <button
             type="button"
@@ -99,10 +156,10 @@ export default function StudentsPage() {
               setServerError(null);
               setDialogOpen(true);
             }}
-            className="inline-flex cursor-pointer items-center gap-1 rounded-md bg-primary px-md py-sm text-sm font-medium text-primary-foreground transition-colors hover:opacity-90"
+            className="inline-flex cursor-pointer items-center gap-1 rounded bg-primary px-md py-sm text-sm font-medium text-primary-foreground transition-colors hover:opacity-90"
           >
             <Plus className="h-4 w-4" />
-            New Student
+            Add Student
           </button>
         )}
       </div>
@@ -120,7 +177,7 @@ export default function StudentsPage() {
                 <button
                   type="button"
                   onClick={() => confirm(`Withdraw ${r.admissionNumber}?`) && removeStudent.mutate(r.id)}
-                  className="cursor-pointer rounded-md p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                  className="cursor-pointer rounded p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                   aria-label={`Withdraw ${r.admissionNumber}`}
                 >
                   <Trash2 className="h-4 w-4" />
@@ -169,7 +226,7 @@ export default function StudentsPage() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full cursor-pointer rounded-md bg-primary px-md py-sm text-sm font-medium text-primary-foreground transition-colors hover:opacity-90 disabled:opacity-60"
+            className="w-full cursor-pointer rounded bg-primary px-md py-sm text-sm font-medium text-primary-foreground transition-colors hover:opacity-90 disabled:opacity-60"
           >
             {isSubmitting ? 'Creating…' : 'Create'}
           </button>
