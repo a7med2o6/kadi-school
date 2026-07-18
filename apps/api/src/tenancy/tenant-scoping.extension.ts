@@ -28,17 +28,24 @@ function scopeOperation(model: string) {
   };
 }
 
+const TENANT_SCOPED_MODELS = [
+  'user',
+  'role',
+  'refreshToken',
+  'academicYear',
+  'gradeLevel',
+  'class',
+  'subject',
+  'classSubject',
+  'teacher',
+  'student',
+  'parent',
+  'studentGuardian',
+] as const;
+
 export const tenantScopingExtension = Prisma.defineExtension({
   name: 'tenant-scoping',
-  query: {
-    user: {
-      $allOperations: scopeOperation('user'),
-    },
-    role: {
-      $allOperations: scopeOperation('role'),
-    },
-    refreshToken: {
-      $allOperations: scopeOperation('refreshToken'),
-    },
-  },
+  query: Object.fromEntries(
+    TENANT_SCOPED_MODELS.map((model) => [model, { $allOperations: scopeOperation(model) }]),
+  ) as Record<(typeof TENANT_SCOPED_MODELS)[number], { $allOperations: ReturnType<typeof scopeOperation> }>,
 });

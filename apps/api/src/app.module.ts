@@ -2,10 +2,15 @@ import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { AcademicsModule } from './academics/academics.module';
 import { CoreModule } from './core/core.module';
 import { IamModule } from './iam/iam.module';
+import { ParentsModule } from './parents/parents.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { StudentsModule } from './students/students.module';
+import { SubjectsModule } from './subjects/subjects.module';
 import { SuperAdminModule } from './super-admin/super-admin.module';
+import { TeachersModule } from './teachers/teachers.module';
 import { TenantMiddleware } from './tenancy/tenant.middleware';
 
 @Module({
@@ -18,6 +23,11 @@ import { TenantMiddleware } from './tenancy/tenant.middleware';
     CoreModule,
     IamModule,
     SuperAdminModule,
+    AcademicsModule,
+    SubjectsModule,
+    TeachersModule,
+    StudentsModule,
+    ParentsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

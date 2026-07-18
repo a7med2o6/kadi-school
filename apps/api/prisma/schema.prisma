@@ -34,8 +34,17 @@ model School {
   createdAt     DateTime     @default(now()) @map("created_at")
   updatedAt     DateTime     @updatedAt @map("updated_at")
 
-  users User[]
-  roles Role[]
+  users         User[]
+  roles         Role[]
+  academicYears AcademicYear[]
+  gradeLevels   GradeLevel[]
+  classes       Class[]
+  subjects      Subject[]
+  classSubjects ClassSubject[]
+  teachers         Teacher[]
+  students         Student[]
+  parents          Parent[]
+  studentGuardians StudentGuardian[]
 
   @@map("schools")
 }
@@ -57,6 +66,9 @@ model User {
 
   userRoles     UserRole[]
   refreshTokens RefreshToken[]
+  teacher       Teacher?
+  student       Student?
+  parent        Parent?
 
   @@unique([schoolId, email])
   @@unique([schoolId, civilId])
@@ -144,4 +156,169 @@ model SuperAdmin {
   createdAt    DateTime @default(now()) @map("created_at")
 
   @@map("super_admins")
+}
+
+model AcademicYear {
+  id        String   @id @default(uuid())
+  schoolId  String   @map("school_id")
+  school    School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  name      String
+  startDate DateTime @map("start_date")
+  endDate   DateTime @map("end_date")
+  isCurrent Boolean  @default(false) @map("is_current")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  classes Class[]
+
+  @@index([schoolId])
+  @@map("academic_years")
+}
+
+model GradeLevel {
+  id       String @id @default(uuid())
+  schoolId String @map("school_id")
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  name     String
+  order    Int
+
+  classes Class[]
+
+  @@index([schoolId])
+  @@map("grade_levels")
+}
+
+model Class {
+  id                String       @id @default(uuid())
+  schoolId          String       @map("school_id")
+  school            School       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  gradeLevelId      String       @map("grade_level_id")
+  gradeLevel        GradeLevel   @relation(fields: [gradeLevelId], references: [id], onDelete: Cascade)
+  academicYearId    String       @map("academic_year_id")
+  academicYear      AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+  name              String
+  homeroomTeacherId String?      @map("homeroom_teacher_id")
+  homeroomTeacher   Teacher?     @relation(fields: [homeroomTeacherId], references: [id], onDelete: SetNull)
+  capacity          Int?
+  createdAt         DateTime     @default(now()) @map("created_at")
+
+  students      Student[]
+  classSubjects ClassSubject[]
+
+  @@index([schoolId])
+  @@index([academicYearId])
+  @@map("classes")
+}
+
+model Subject {
+  id       String @id @default(uuid())
+  schoolId String @map("school_id")
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  name     String
+  code     String
+
+  classSubjects ClassSubject[]
+
+  @@unique([schoolId, code])
+  @@index([schoolId])
+  @@map("subjects")
+}
+
+model ClassSubject {
+  id        String   @id @default(uuid())
+  schoolId  String   @map("school_id")
+  school    School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  classId   String   @map("class_id")
+  class     Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  subjectId String   @map("subject_id")
+  subject   Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  teacherId String?  @map("teacher_id")
+  teacher   Teacher? @relation(fields: [teacherId], references: [id], onDelete: SetNull)
+
+  @@unique([classId, subjectId])
+  @@index([schoolId])
+  @@map("class_subjects")
+}
+
+model Teacher {
+  id             String   @id @default(uuid())
+  schoolId       String   @map("school_id")
+  school         School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  userId         String   @unique @map("user_id")
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  employeeNumber String   @map("employee_number")
+  hireDate       DateTime @map("hire_date")
+  employmentType String   @default("full_time") @map("employment_type")
+  department     String?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  homeroomClasses Class[]
+  classSubjects   ClassSubject[]
+
+  @@unique([schoolId, employeeNumber])
+  @@index([schoolId])
+  @@map("teachers")
+}
+
+enum StudentStatus {
+  ACTIVE
+  GRADUATED
+  TRANSFERRED
+  WITHDRAWN
+
+  @@map("student_status")
+}
+
+model Student {
+  id              String        @id @default(uuid())
+  schoolId        String        @map("school_id")
+  school          School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  userId          String        @unique @map("user_id")
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  classId         String?       @map("class_id")
+  class           Class?        @relation(fields: [classId], references: [id], onDelete: SetNull)
+  admissionNumber String        @map("admission_number")
+  dateOfBirth     DateTime?     @map("date_of_birth")
+  gender          String?
+  enrollmentDate  DateTime      @default(now()) @map("enrollment_date")
+  status          StudentStatus @default(ACTIVE)
+  createdAt       DateTime      @default(now()) @map("created_at")
+
+  guardians StudentGuardian[]
+
+  @@unique([schoolId, admissionNumber])
+  @@index([schoolId])
+  @@index([classId])
+  @@map("students")
+}
+
+model Parent {
+  id                  String   @id @default(uuid())
+  schoolId            String   @map("school_id")
+  school              School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  userId              String   @unique @map("user_id")
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  occupation          String?
+  relationshipDefault String?  @map("relationship_default")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  students StudentGuardian[]
+
+  @@index([schoolId])
+  @@map("parents")
+}
+
+model StudentGuardian {
+  id               String  @id @default(uuid())
+  schoolId         String  @map("school_id")
+  school           School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  studentId        String  @map("student_id")
+  student          Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  parentId         String  @map("parent_id")
+  parent           Parent  @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  relationship     String
+  isPrimaryContact Boolean @default(false) @map("is_primary_contact")
+
+  @@unique([studentId, parentId])
+  @@index([schoolId])
+  @@map("student_guardians")
 }

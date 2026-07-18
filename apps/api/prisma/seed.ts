@@ -12,6 +12,12 @@ const PERMISSIONS = [
   { key: 'students:write', module: 'students', description: 'Manage student records' },
   { key: 'teachers:read', module: 'teachers', description: 'View teacher records' },
   { key: 'teachers:write', module: 'teachers', description: 'Manage teacher records' },
+  { key: 'parents:read', module: 'parents', description: 'View parent/guardian records' },
+  { key: 'parents:write', module: 'parents', description: 'Manage parent/guardian records' },
+  { key: 'classes:read', module: 'classes', description: 'View academic years, grade levels, classes' },
+  { key: 'classes:write', module: 'classes', description: 'Manage academic years, grade levels, classes' },
+  { key: 'subjects:read', module: 'subjects', description: 'View subjects and class-subject assignments' },
+  { key: 'subjects:write', module: 'subjects', description: 'Manage subjects and class-subject assignments' },
   { key: 'timetable:read', module: 'timetable', description: 'View timetable' },
   { key: 'attendance:read', module: 'attendance', description: 'View attendance records' },
   { key: 'attendance:write', module: 'attendance', description: 'Record attendance' },
@@ -36,7 +42,15 @@ const DEFAULT_ROLES: { name: string; permissions: readonly string[] }[] = [
   { name: 'Vice Principal', permissions: ALL_READ },
   {
     name: 'Teacher',
-    permissions: ['students:read', 'timetable:read', 'attendance:write', 'grades:write', 'homework:write'],
+    permissions: [
+      'students:read',
+      'classes:read',
+      'subjects:read',
+      'timetable:read',
+      'attendance:write',
+      'grades:write',
+      'homework:write',
+    ],
   },
   {
     name: 'Student',
@@ -53,9 +67,12 @@ const DEFAULT_ROLES: { name: string; permissions: readonly string[] }[] = [
       'finance:read',
     ],
   },
-  { name: 'HR', permissions: ['users:read', 'teachers:write', 'payroll:write'] },
+  { name: 'HR', permissions: ['users:read', 'teachers:read', 'teachers:write', 'payroll:write'] },
   { name: 'Accountant', permissions: ['finance:write', 'payroll:read'] },
-  { name: 'Reception', permissions: ['users:read', 'students:write', 'notifications:write'] },
+  {
+    name: 'Reception',
+    permissions: ['users:read', 'students:read', 'students:write', 'parents:read', 'parents:write', 'notifications:write'],
+  },
 ];
 
 async function seedPermissionCatalog() {
