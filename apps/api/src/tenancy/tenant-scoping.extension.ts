@@ -37,5 +37,8 @@ export const tenantScopingExtension = Prisma.defineExtension({
     role: {
       $allOperations: scopeOperation('role'),
     },
+    refreshToken: {
+      $allOperations: scopeOperation('refreshToken'),
+    },
   },
 });

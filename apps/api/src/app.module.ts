@@ -2,8 +2,10 @@ import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { CoreModule } from './core/core.module';
+import { IamModule } from './iam/iam.module';
 import { PrismaModule } from './prisma/prisma.module';
-import { TenancyModule } from './tenancy/tenancy.module';
+import { SuperAdminModule } from './super-admin/super-admin.module';
 import { TenantMiddleware } from './tenancy/tenant.middleware';
 
 @Module({
@@ -13,7 +15,9 @@ import { TenantMiddleware } from './tenancy/tenant.middleware';
       envFilePath: '.env',
     }),
     PrismaModule,
-    TenancyModule,
+    CoreModule,
+    IamModule,
+    SuperAdminModule,
   ],
   controllers: [AppController],
   providers: [AppService],

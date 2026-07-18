@@ -2,16 +2,19 @@ import { Injectable, NestMiddleware } from '@nestjs/common';
 import type { NextFunction, Request, Response } from 'express';
 import { PrismaService } from '../prisma/prisma.service';
 
+const RESERVED_SUBDOMAINS = new Set(['localhost', 'www', 'admin', 'api']);
+
 /**
  * `{slug}.kadischool.app` -> "slug". Bare hosts (localhost, apex domain, www)
- * resolve to no tenant, so platform-level routes (health checks, Super Admin,
- * marketing) can run without a school in scope.
+ * and reserved platform subdomains (admin, api) resolve to no tenant, so
+ * platform-level routes (health checks, Super Admin, marketing) can run
+ * without a school in scope — and can never collide with a real school slug.
  */
 function extractSchoolSlug(hostname: string): string | null {
   const labels = hostname.split('.');
   if (labels.length < 2) return null;
   const [first] = labels;
-  if (first === 'localhost' || first === 'www') return null;
+  if (RESERVED_SUBDOMAINS.has(first)) return null;
   return first;
 }
 
