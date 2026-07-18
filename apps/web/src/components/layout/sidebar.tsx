@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { GraduationCap, LayoutDashboard, School, UsersRound, BookOpen, Users } from 'lucide-react';
+import { CalendarDays, GraduationCap, LayoutDashboard, School, UsersRound, BookOpen, Users } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth-store';
 
 interface NavItem {
@@ -16,6 +16,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/classes', label: 'Classes', icon: School, permission: 'classes:read' },
   { href: '/subjects', label: 'Subjects', icon: BookOpen, permission: 'subjects:read' },
+  { href: '/timetable', label: 'Timetable', icon: CalendarDays, permission: 'timetable:read' },
   { href: '/teachers', label: 'Teachers', icon: GraduationCap, permission: 'teachers:read' },
   { href: '/students', label: 'Students', icon: UsersRound, permission: 'students:read' },
   { href: '/users', label: 'Users', icon: Users, permission: 'users:read' },

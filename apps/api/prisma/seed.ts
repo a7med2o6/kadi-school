@@ -19,6 +19,7 @@ const PERMISSIONS = [
   { key: 'subjects:read', module: 'subjects', description: 'View subjects and class-subject assignments' },
   { key: 'subjects:write', module: 'subjects', description: 'Manage subjects and class-subject assignments' },
   { key: 'timetable:read', module: 'timetable', description: 'View timetable' },
+  { key: 'timetable:write', module: 'timetable', description: 'Manage timetable slots' },
   { key: 'attendance:read', module: 'attendance', description: 'View attendance records' },
   { key: 'attendance:write', module: 'attendance', description: 'Record attendance' },
   { key: 'grades:read', module: 'grades', description: 'View grades' },
@@ -39,7 +40,7 @@ const ALL_READ = ALL_KEYS.filter((k) => k.endsWith(':read'));
 const DEFAULT_ROLES: { name: string; permissions: readonly string[] }[] = [
   { name: 'School Admin', permissions: ALL_KEYS },
   { name: 'Principal', permissions: ALL_READ },
-  { name: 'Vice Principal', permissions: ALL_READ },
+  { name: 'Vice Principal', permissions: [...ALL_READ, 'timetable:write'] },
   {
     name: 'Teacher',
     permissions: [

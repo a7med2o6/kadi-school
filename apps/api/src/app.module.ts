@@ -12,6 +12,7 @@ import { SubjectsModule } from './subjects/subjects.module';
 import { SuperAdminModule } from './super-admin/super-admin.module';
 import { TeachersModule } from './teachers/teachers.module';
 import { TenantMiddleware } from './tenancy/tenant.middleware';
+import { TimetableModule } from './timetable/timetable.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { TenantMiddleware } from './tenancy/tenant.middleware';
     TeachersModule,
     StudentsModule,
     ParentsModule,
+    TimetableModule,
   ],
   controllers: [AppController],
   providers: [AppService],

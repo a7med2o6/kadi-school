@@ -41,6 +41,7 @@ const TENANT_SCOPED_MODELS = [
   'student',
   'parent',
   'studentGuardian',
+  'timetableSlot',
 ] as const;
 
 export const tenantScopingExtension = Prisma.defineExtension({
