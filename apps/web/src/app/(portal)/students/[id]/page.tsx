@@ -3,12 +3,13 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
-import { ChevronRight, FileText, GraduationCap, ReceiptText, TrendingUp } from 'lucide-react';
-import { apiClient } from '@/lib/api-client';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ChevronRight, Download, FileText, GraduationCap, Printer, ReceiptText, TrendingUp } from 'lucide-react';
+import { apiClient, ApiError } from '@/lib/api-client';
 import { useTranslations } from '@/lib/i18n/use-translations';
 import { interpolate } from '@/lib/i18n';
 import { useLocaleStore } from '@/stores/locale-store';
+import { hasPermission } from '@/stores/auth-store';
 
 interface Guardian {
   relationship: string;
@@ -27,8 +28,30 @@ interface StudentDetail {
   guardians: Guardian[];
 }
 
+type AttendanceStatusValue = 'PRESENT' | 'LATE' | 'ABSENT' | 'EXCUSED';
+interface AttendanceRecord {
+  id: string;
+  date: string;
+  status: AttendanceStatusValue;
+  arrivalTime: string | null;
+  note: string | null;
+}
+interface AttendanceNote {
+  id: string;
+  body: string;
+  createdAt: string;
+  authorUser: { email: string | null } | null;
+}
+
 const TABS = ['overview', 'grades', 'attendance', 'fees', 'documents'] as const;
 type Tab = (typeof TABS)[number];
+
+const STATUS_DOT: Record<AttendanceStatusValue, string> = {
+  PRESENT: 'bg-success/15 text-success',
+  LATE: 'bg-tertiary/15 text-tertiary',
+  ABSENT: 'bg-destructive/15 text-destructive',
+  EXCUSED: 'bg-secondary/15 text-secondary',
+};
 
 function initials(label: string) {
   return label
@@ -39,16 +62,54 @@ function initials(label: string) {
     .join('');
 }
 
+function monthRange(month: string) {
+  const [y, m] = month.split('-').map(Number);
+  const start = new Date(Date.UTC(y, m - 1, 1));
+  const end = new Date(Date.UTC(y, m, 0));
+  return { start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10), year: y, monthIndex: m - 1 };
+}
+
 export default function StudentDetailPage() {
   const params = useParams<{ id: string }>();
   const [tab, setTab] = useState<Tab>('overview');
+  const [reportMonth, setReportMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [noteBody, setNoteBody] = useState('');
   const t = useTranslations();
   const locale = useLocaleStore((s) => s.locale);
+  const queryClient = useQueryClient();
+  const canWrite = hasPermission('attendance:write');
 
   const { data: student, isLoading } = useQuery({
     queryKey: ['students', params.id],
     queryFn: () => apiClient.get<StudentDetail>(`/students/${params.id}`),
   });
+
+  const { start, end } = monthRange(reportMonth);
+  const attendanceQuery = useQuery({
+    queryKey: ['attendance-students', params.id, reportMonth],
+    queryFn: () => apiClient.get<AttendanceRecord[]>(`/attendance/students?studentId=${params.id}&from=${start}&to=${end}`),
+    enabled: !!params.id,
+  });
+  const notesQuery = useQuery({
+    queryKey: ['attendance-notes', params.id],
+    queryFn: () => apiClient.get<AttendanceNote[]>(`/attendance/notes?studentId=${params.id}`),
+    enabled: !!params.id,
+  });
+
+  const addNoteMutation = useMutation({
+    mutationFn: (body: string) => apiClient.post('/attendance/notes', { studentId: params.id, body }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['attendance-notes', params.id] });
+      setNoteBody('');
+    },
+  });
+
+  const records = attendanceQuery.data ?? [];
+  const presentDays = records.filter((r) => r.status === 'PRESENT').length;
+  const lateDays = records.filter((r) => r.status === 'LATE').length;
+  const absentDays = records.filter((r) => r.status === 'ABSENT').length;
+  const schoolDays = records.length;
+  const attendanceRate = schoolDays > 0 ? Math.round(((presentDays + lateDays) / schoolDays) * 100) : null;
 
   if (isLoading || !student) {
     return <p className="text-sm text-muted-foreground">{t.common.loading}</p>;
@@ -191,16 +252,22 @@ export default function StudentDetailPage() {
                 <div className="text-2xl font-bold text-muted-foreground">—</div>
                 <p className="text-xs text-muted-foreground">{t.studentDetail.gpaPlaceholder}</p>
               </div>
-              <div className="rounded-lg border border-border bg-card p-lg shadow-ambient">
+              <button
+                type="button"
+                onClick={() => setTab('attendance')}
+                className="cursor-pointer rounded-lg border border-border bg-card p-lg text-start shadow-ambient transition-colors hover:bg-accent"
+              >
                 <div className="mb-2 flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">{t.studentDetail.attendance}</span>
                   <span className="flex h-9 w-9 items-center justify-center rounded-full bg-secondary/10 text-secondary">
                     <GraduationCap className="h-4 w-4" />
                   </span>
                 </div>
-                <div className="text-2xl font-bold text-muted-foreground">—</div>
-                <p className="text-xs text-muted-foreground">{t.studentDetail.attendancePlaceholder}</p>
-              </div>
+                <div className="text-2xl font-bold text-foreground">{attendanceRate !== null ? `${attendanceRate}%` : '—'}</div>
+                <p className="text-xs text-muted-foreground">
+                  {attendanceRate !== null ? t.attendanceReport.title : t.studentDetail.attendancePlaceholder}
+                </p>
+              </button>
             </div>
 
             <div className="rounded-lg border border-border bg-card p-lg shadow-ambient">
@@ -226,9 +293,238 @@ export default function StudentDetailPage() {
       )}
 
       {tab === 'grades' && <EmptyTab icon={TrendingUp} message={t.studentDetail.gradesEmpty} />}
-      {tab === 'attendance' && <EmptyTab icon={GraduationCap} message={t.studentDetail.attendanceEmpty} />}
+
+      {tab === 'attendance' && (
+        <div className="space-y-lg">
+          <div className="flex flex-wrap items-center justify-between gap-md">
+            <input
+              type="month"
+              value={reportMonth}
+              onChange={(e) => setReportMonth(e.target.value)}
+              className="rounded-md border border-input bg-background px-md py-sm text-sm text-foreground outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
+              dir="ltr"
+            />
+            <div className="flex gap-sm">
+              <button
+                type="button"
+                disabled
+                title={t.common.comingSoon}
+                className="inline-flex cursor-not-allowed items-center gap-1 rounded-md border border-border px-md py-sm text-sm font-medium text-muted-foreground opacity-60"
+              >
+                <Download className="h-4 w-4" />
+                {t.attendanceReport.downloadPdf}
+              </button>
+              <button
+                type="button"
+                disabled
+                title={t.common.comingSoon}
+                className="inline-flex cursor-not-allowed items-center gap-1 rounded-md border border-border px-md py-sm text-sm font-medium text-muted-foreground opacity-60"
+              >
+                <Printer className="h-4 w-4" />
+                {t.attendanceReport.printReport}
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-md lg:grid-cols-5">
+            <div className="rounded-lg border border-border bg-card p-lg text-center shadow-ambient">
+              <div className="text-2xl font-bold text-primary">{attendanceRate !== null ? `${attendanceRate}%` : '—'}</div>
+              <div className="text-xs text-muted-foreground">{t.attendanceReport.attendanceRate}</div>
+            </div>
+            <div className="rounded-lg border border-border bg-card p-lg text-center shadow-ambient">
+              <div className="text-2xl font-bold text-tertiary">{lateDays}</div>
+              <div className="text-xs text-muted-foreground">{t.attendanceReport.lateDays}</div>
+            </div>
+            <div className="rounded-lg border border-border bg-card p-lg text-center shadow-ambient">
+              <div className="text-2xl font-bold text-destructive">{absentDays}</div>
+              <div className="text-xs text-muted-foreground">{t.attendanceReport.absentDays}</div>
+            </div>
+            <div className="rounded-lg border border-border bg-card p-lg text-center shadow-ambient">
+              <div className="text-2xl font-bold text-success">{presentDays}</div>
+              <div className="text-xs text-muted-foreground">{t.attendanceReport.presentDays}</div>
+            </div>
+            <div className="rounded-lg border border-border bg-card p-lg text-center shadow-ambient">
+              <div className="text-2xl font-bold text-foreground">{schoolDays}</div>
+              <div className="text-xs text-muted-foreground">{t.attendanceReport.schoolDays}</div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-lg lg:grid-cols-3">
+            <div className="space-y-lg lg:col-span-1">
+              <div className="rounded-lg border border-border bg-card p-lg shadow-ambient">
+                <h3 className="mb-md text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                  {t.attendanceReport.legendTitle}
+                </h3>
+                <ul className="space-y-sm text-sm">
+                  {(['PRESENT', 'ABSENT', 'LATE', 'EXCUSED'] as AttendanceStatusValue[]).map((s) => (
+                    <li key={s} className="flex items-start gap-sm">
+                      <span className={`mt-0.5 h-4 w-4 shrink-0 rounded-full ${STATUS_DOT[s]}`} />
+                      <div>
+                        <div className="font-medium text-foreground">{t.attendanceStatus[s]}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {s === 'PRESENT' && t.attendanceReport.legendPresentDesc}
+                          {s === 'ABSENT' && t.attendanceReport.legendAbsentDesc}
+                          {s === 'LATE' && t.attendanceReport.legendLateDesc}
+                          {s === 'EXCUSED' && t.attendanceReport.legendExcusedDesc}
+                        </div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="rounded-lg border border-border bg-card p-lg shadow-ambient">
+                <h3 className="mb-md text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                  {t.attendanceReport.supervisorNotes}
+                </h3>
+                {canWrite && (
+                  <div className="mb-md flex gap-sm">
+                    <input
+                      type="text"
+                      value={noteBody}
+                      onChange={(e) => setNoteBody(e.target.value)}
+                      placeholder={t.attendanceReport.addNotePlaceholder}
+                      className="flex-1 rounded-md border border-input bg-background px-sm py-1.5 text-sm text-foreground outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
+                    />
+                    <button
+                      type="button"
+                      disabled={!noteBody.trim() || addNoteMutation.isPending}
+                      onClick={() => addNoteMutation.mutate(noteBody.trim())}
+                      className="cursor-pointer rounded-md bg-primary px-md py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {t.attendanceReport.postNote}
+                    </button>
+                  </div>
+                )}
+                {addNoteMutation.isError && (
+                  <p className="mb-sm text-sm text-destructive">
+                    {addNoteMutation.error instanceof ApiError ? addNoteMutation.error.message : 'Something went wrong'}
+                  </p>
+                )}
+                {!notesQuery.data || notesQuery.data.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">{t.attendanceReport.noNotesYet}</p>
+                ) : (
+                  <ul className="space-y-sm">
+                    {notesQuery.data.slice(0, 3).map((n) => (
+                      <li key={n.id} className="flex items-start gap-sm">
+                        <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+                          {initials(n.authorUser?.email ?? '?')}
+                        </span>
+                        <div>
+                          <p className="text-sm text-foreground">{n.body}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {n.authorUser?.email} · {new Date(n.createdAt).toLocaleDateString(dateLocale)}
+                          </p>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+
+            <div className="lg:col-span-2">
+              <MonthCalendar month={reportMonth} records={records} dayLabels={t.timetable.shortDays} />
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-border bg-card p-lg shadow-ambient">
+            <h3 className="mb-md text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              {t.attendanceReport.detailedLog}
+            </h3>
+            {records.length === 0 ? (
+              <p className="text-sm text-muted-foreground">{t.attendanceReport.noRecordsYet}</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-start text-sm">
+                  <thead className="border-b border-border text-muted-foreground">
+                    <tr>
+                      <th className="whitespace-nowrap px-md py-sm text-start font-medium">{t.attendanceReport.logDate}</th>
+                      <th className="whitespace-nowrap px-md py-sm text-start font-medium">{t.attendanceReport.logDay}</th>
+                      <th className="whitespace-nowrap px-md py-sm text-start font-medium">{t.attendanceRegister.status}</th>
+                      <th className="whitespace-nowrap px-md py-sm text-start font-medium">{t.attendanceReport.logArrival}</th>
+                      <th className="whitespace-nowrap px-md py-sm text-start font-medium">{t.attendanceRegister.notes}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...records]
+                      .sort((a, b) => b.date.localeCompare(a.date))
+                      .map((r) => (
+                        <tr key={r.id} className="border-b border-border last:border-0">
+                          <td className="whitespace-nowrap px-md py-sm text-foreground" dir="ltr">
+                            {r.date.slice(0, 10)}
+                          </td>
+                          <td className="whitespace-nowrap px-md py-sm text-foreground">
+                            {t.timetable.days[new Date(r.date).getUTCDay()]}
+                          </td>
+                          <td className="whitespace-nowrap px-md py-sm">
+                            <span className={`rounded-full px-sm py-0.5 text-xs font-medium ${STATUS_DOT[r.status]}`}>
+                              {t.attendanceStatus[r.status]}
+                            </span>
+                          </td>
+                          <td className="whitespace-nowrap px-md py-sm text-foreground" dir="ltr">
+                            {r.arrivalTime ?? '—'}
+                          </td>
+                          <td className="px-md py-sm text-foreground">{r.note ?? '—'}</td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          <p className="text-center text-xs text-muted-foreground">{t.attendanceReport.generatedFooter}</p>
+        </div>
+      )}
+
       {tab === 'fees' && <EmptyTab icon={ReceiptText} message={t.studentDetail.feesEmpty} />}
       {tab === 'documents' && <EmptyTab icon={FileText} message={t.studentDetail.documentsEmpty} />}
+    </div>
+  );
+}
+
+function MonthCalendar({
+  month,
+  records,
+  dayLabels,
+}: {
+  month: string;
+  records: AttendanceRecord[];
+  dayLabels: string[];
+}) {
+  const { year, monthIndex } = monthRange(month);
+  const byDate = new Map(records.map((r) => [r.date.slice(0, 10), r]));
+  const firstOfMonth = new Date(Date.UTC(year, monthIndex, 1));
+  const daysInMonth = new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();
+  const leadingBlanks = firstOfMonth.getUTCDay();
+
+  const cells: (number | null)[] = [...Array(leadingBlanks).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
+
+  return (
+    <div className="rounded-lg border border-border bg-card p-lg shadow-ambient">
+      <div className="mb-sm grid grid-cols-7 gap-1 text-center text-xs font-medium text-muted-foreground">
+        {dayLabels.map((d) => (
+          <div key={d}>{d}</div>
+        ))}
+      </div>
+      <div className="grid grid-cols-7 gap-1">
+        {cells.map((day, i) => {
+          if (day === null) return <div key={`blank-${i}`} />;
+          const dateStr = `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+          const record = byDate.get(dateStr);
+          return (
+            <div
+              key={dateStr}
+              className={`flex aspect-square flex-col items-center justify-center rounded-md text-xs ${
+                record ? STATUS_DOT[record.status] : 'bg-muted text-muted-foreground'
+              }`}
+            >
+              <span className="font-medium">{day}</span>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

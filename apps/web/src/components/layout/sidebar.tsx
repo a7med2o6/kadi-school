@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import {
+  CalendarCheck,
   CalendarDays,
   GraduationCap,
   LayoutDashboard,
@@ -26,6 +27,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard', labelKey: 'dashboard', icon: LayoutDashboard },
+  { href: '/attendance', labelKey: 'attendance', icon: CalendarCheck, permission: 'attendance:read' },
   { href: '/classes', labelKey: 'classes', icon: School, permission: 'classes:read' },
   { href: '/subjects', labelKey: 'subjects', icon: BookOpen, permission: 'subjects:read' },
   { href: '/timetable', labelKey: 'timetable', icon: CalendarDays, permission: 'timetable:read' },

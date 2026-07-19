@@ -46,6 +46,10 @@ model School {
   parents          Parent[]
   studentGuardians StudentGuardian[]
   timetableSlots   TimetableSlot[]
+  studentAttendances    StudentAttendance[]
+  teacherAttendances    TeacherAttendance[]
+  teacherLeaveRequests  TeacherLeaveRequest[]
+  studentAttendanceNotes StudentAttendanceNote[]
 
   @@map("schools")
 }
@@ -70,6 +74,7 @@ model User {
   teacher       Teacher?
   student       Student?
   parent        Parent?
+  attendanceNotesAuthored StudentAttendanceNote[]
 
   @@unique([schoolId, email])
   @@unique([schoolId, civilId])
@@ -204,6 +209,7 @@ model Class {
 
   students      Student[]
   classSubjects ClassSubject[]
+  attendanceRecords StudentAttendance[]
 
   @@index([schoolId])
   @@index([academicYearId])
@@ -277,6 +283,8 @@ model Teacher {
 
   homeroomClasses Class[]
   classSubjects   ClassSubject[]
+  leaveRequests      TeacherLeaveRequest[]
+  attendanceRecords  TeacherAttendance[]
 
   @@unique([schoolId, employeeNumber])
   @@index([schoolId])
@@ -308,6 +316,8 @@ model Student {
   createdAt       DateTime      @default(now()) @map("created_at")
 
   guardians StudentGuardian[]
+  attendanceRecords StudentAttendance[]
+  attendanceNotes   StudentAttendanceNote[]
 
   @@unique([schoolId, admissionNumber])
   @@index([schoolId])
@@ -345,4 +355,112 @@ model StudentGuardian {
   @@unique([studentId, parentId])
   @@index([schoolId])
   @@map("student_guardians")
+}
+
+enum AttendanceStatus {
+  PRESENT
+  LATE
+  ABSENT
+  EXCUSED
+
+  @@map("attendance_status")
+}
+
+/// Tenant-scoped. One row per student per calendar day. `classId` is a snapshot
+/// of the student's class at the time attendance was taken, so historical
+/// registers stay correct even if the student later transfers classes.
+model StudentAttendance {
+  id          String           @id @default(uuid())
+  schoolId    String           @map("school_id")
+  school      School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  studentId   String           @map("student_id")
+  student     Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  classId     String           @map("class_id")
+  class       Class            @relation(fields: [classId], references: [id], onDelete: Cascade)
+  date        DateTime         @db.Date
+  status      AttendanceStatus
+  arrivalTime String?          @map("arrival_time")
+  note        String?
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+
+  @@unique([studentId, date])
+  @@index([schoolId])
+  @@index([classId, date])
+  @@map("student_attendance")
+}
+
+enum TeacherAttendanceStatus {
+  PRESENT
+  LATE
+  ABSENT
+  ON_LEAVE
+
+  @@map("teacher_attendance_status")
+}
+
+/// Tenant-scoped. One row per teacher per calendar day.
+model TeacherAttendance {
+  id           String                   @id @default(uuid())
+  schoolId     String                   @map("school_id")
+  school       School                   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  teacherId    String                   @map("teacher_id")
+  teacher      Teacher                  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  date         DateTime                 @db.Date
+  status       TeacherAttendanceStatus
+  checkInTime  String?                  @map("check_in_time")
+  checkOutTime String?                  @map("check_out_time")
+  note         String?
+  createdAt    DateTime                 @default(now()) @map("created_at")
+  updatedAt    DateTime                 @updatedAt @map("updated_at")
+
+  @@unique([teacherId, date])
+  @@index([schoolId])
+  @@index([schoolId, date])
+  @@map("teacher_attendance")
+}
+
+enum LeaveRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+
+  @@map("leave_request_status")
+}
+
+/// Tenant-scoped. Approving a request creates ON_LEAVE TeacherAttendance rows
+/// for each date in [startDate, endDate].
+model TeacherLeaveRequest {
+  id        String              @id @default(uuid())
+  schoolId  String              @map("school_id")
+  school    School              @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  teacherId String              @map("teacher_id")
+  teacher   Teacher             @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  startDate DateTime            @map("start_date") @db.Date
+  endDate   DateTime            @map("end_date") @db.Date
+  reason    String?
+  status    LeaveRequestStatus  @default(PENDING)
+  createdAt DateTime            @default(now()) @map("created_at")
+  updatedAt DateTime            @updatedAt @map("updated_at")
+
+  @@index([schoolId])
+  @@map("teacher_leave_requests")
+}
+
+/// Tenant-scoped. Free-text supervisor notes attached to a student's
+/// attendance record, shown on the student attendance report.
+model StudentAttendanceNote {
+  id           String   @id @default(uuid())
+  schoolId     String   @map("school_id")
+  school       School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  studentId    String   @map("student_id")
+  student      Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  authorUserId String?  @map("author_user_id")
+  authorUser   User?    @relation(fields: [authorUserId], references: [id], onDelete: SetNull)
+  body         String
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([schoolId])
+  @@index([studentId])
+  @@map("student_attendance_notes")
 }

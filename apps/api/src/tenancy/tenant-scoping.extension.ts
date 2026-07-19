@@ -20,6 +20,12 @@ function scopeOperation(model: string) {
     } else if (operation === 'createMany') {
       const rows = Array.isArray(args.data) ? args.data : [args.data];
       args.data = rows.map((row: Record<string, unknown>) => ({ ...row, schoolId: store.schoolId }));
+    } else if (operation === 'upsert') {
+      // upsert has both a lookup (`where`) and a nested insert payload (`create`) —
+      // both need scoping, or an upsert that falls through to insert would create
+      // a cross-tenant-invisible row with no schoolId.
+      args.where = { ...(args.where ?? {}), schoolId: store.schoolId };
+      args.create = { ...(args.create ?? {}), schoolId: store.schoolId };
     } else {
       args.where = { ...(args.where ?? {}), schoolId: store.schoolId };
     }
@@ -42,6 +48,10 @@ const TENANT_SCOPED_MODELS = [
   'parent',
   'studentGuardian',
   'timetableSlot',
+  'studentAttendance',
+  'teacherAttendance',
+  'teacherLeaveRequest',
+  'studentAttendanceNote',
 ] as const;
 
 export const tenantScopingExtension = Prisma.defineExtension({

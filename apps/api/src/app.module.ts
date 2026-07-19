@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AcademicsModule } from './academics/academics.module';
+import { AttendanceModule } from './attendance/attendance.module';
 import { CoreModule } from './core/core.module';
 import { IamModule } from './iam/iam.module';
 import { ParentsModule } from './parents/parents.module';
@@ -30,6 +31,7 @@ import { TimetableModule } from './timetable/timetable.module';
     StudentsModule,
     ParentsModule,
     TimetableModule,
+    AttendanceModule,
   ],
   controllers: [AppController],
   providers: [AppService],
