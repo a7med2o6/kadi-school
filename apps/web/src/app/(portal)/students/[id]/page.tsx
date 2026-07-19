@@ -13,6 +13,7 @@ import {
   ChevronRight,
   ClipboardCheck,
   Download,
+  FileQuestion,
   FileText,
   GraduationCap,
   MessageSquare,
@@ -42,6 +43,7 @@ interface StudentDetail {
   dateOfBirth: string | null;
   gender: string | null;
   nationality: string | null;
+  busRoute: string | null;
   enrollmentDate: string;
   class: { id: string; name: string } | null;
   user: { email: string | null; civilId: string | null; phone: string | null; avatarUrl: string | null };
@@ -75,6 +77,7 @@ const editProfileSchema = z.object({
   dateOfBirth: z.string().optional(),
   gender: z.union([z.enum(['male', 'female']), z.literal('')]).optional(),
   nationality: z.string().optional(),
+  busRoute: z.string().optional(),
   classId: z.string().optional(),
 });
 type EditProfileInput = z.infer<typeof editProfileSchema>;
@@ -125,8 +128,16 @@ interface AttendanceNote {
   createdAt: string;
   authorUser: { email: string | null } | null;
 }
+interface ExamScheduleRow {
+  id: string;
+  name: string;
+  examType: string;
+  examDate: string;
+  subject: { name: string };
+  class: { name: string } | null;
+}
 
-const TABS = ['overview', 'grades', 'attendance', 'fees', 'documents'] as const;
+const TABS = ['overview', 'grades', 'attendance', 'exams', 'fees', 'documents'] as const;
 type Tab = (typeof TABS)[number];
 
 const STATUS_DOT: Record<AttendanceStatusValue, string> = {
@@ -186,8 +197,13 @@ export default function StudentDetailPage() {
   const canManageFees = hasPermission('finance:write');
   const canViewDocuments = hasPermission('documents:read');
   const canManageDocuments = hasPermission('documents:write');
+  const canViewExams = hasPermission('exams:read');
 
-  const { data: student, isLoading } = useQuery({
+  const {
+    data: student,
+    isLoading,
+    isError,
+  } = useQuery({
     queryKey: ['students', params.id],
     queryFn: () => apiClient.get<StudentDetail>(`/students/${params.id}`),
   });
@@ -206,6 +222,11 @@ export default function StudentDetailPage() {
     queryKey: ['documents', params.id],
     queryFn: () => apiClient.get<StudentDocumentRow[]>(`/documents?studentId=${params.id}`),
     enabled: !!params.id && canViewDocuments,
+  });
+  const examsQuery = useQuery({
+    queryKey: ['exams-schedule', student?.class?.id],
+    queryFn: () => apiClient.get<ExamScheduleRow[]>(`/exams/schedule?classId=${student?.class?.id}`),
+    enabled: !!student?.class?.id && canViewExams,
   });
 
   const { start, end } = monthRange(reportMonth);
@@ -273,6 +294,7 @@ export default function StudentDetailPage() {
         dateOfBirth: data.dateOfBirth || undefined,
         gender: data.gender || undefined,
         nationality: data.nationality || undefined,
+        busRoute: data.busRoute || undefined,
         classId: data.classId || undefined,
       }),
     onSuccess: () => {
@@ -329,6 +351,10 @@ export default function StudentDetailPage() {
   const absentDays = records.filter((r) => r.status === 'ABSENT').length;
   const schoolDays = records.length;
   const attendanceRate = schoolDays > 0 ? Math.round(((presentDays + lateDays) / schoolDays) * 100) : null;
+
+  if (isError) {
+    return <p className="text-sm text-destructive">{t.common.accessDenied}</p>;
+  }
 
   if (isLoading || !student) {
     return <p className="text-sm text-muted-foreground">{t.common.loading}</p>;
@@ -427,6 +453,7 @@ export default function StudentDetailPage() {
     overview: t.studentDetail.tabOverview,
     grades: t.studentDetail.tabGrades,
     attendance: t.studentDetail.tabAttendance,
+    exams: t.studentDetail.tabExams,
     fees: t.studentDetail.tabFees,
     documents: t.studentDetail.tabDocuments,
   };
@@ -519,6 +546,7 @@ export default function StudentDetailPage() {
                 dateOfBirth: student.dateOfBirth ? student.dateOfBirth.slice(0, 10) : '',
                 gender: (student.gender as 'male' | 'female' | '') ?? '',
                 nationality: student.nationality ?? '',
+                busRoute: student.busRoute ?? '',
                 classId: student.class?.id ?? '',
               });
               setEditDialogOpen(true);
@@ -581,6 +609,10 @@ export default function StudentDetailPage() {
                 <div className="flex justify-between">
                   <dt className="text-muted-foreground">{t.students.nationality}</dt>
                   <dd className="font-medium text-foreground">{student.nationality ?? '—'}</dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt className="text-muted-foreground">{t.students.busRoute}</dt>
+                  <dd className="font-medium text-foreground">{student.busRoute ?? '—'}</dd>
                 </div>
                 <div className="flex justify-between">
                   <dt className="text-muted-foreground">{t.students.civilId}</dt>
@@ -1009,6 +1041,34 @@ export default function StudentDetailPage() {
         </div>
       )}
 
+      {tab === 'exams' && (
+        <div className="space-y-lg">
+          {!canViewExams || (examsQuery.data ?? []).length === 0 ? (
+            <EmptyTab icon={FileQuestion} message={t.studentDetail.examsEmpty} />
+          ) : (
+            <div className="rounded-lg border border-border bg-card p-lg shadow-ambient">
+              <ul className="divide-y divide-border">
+                {(examsQuery.data ?? []).map((exam) => (
+                  <li key={exam.id} className="flex items-center gap-sm py-sm first:pt-0 last:pb-0">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                      <FileQuestion className="h-4 w-4" />
+                    </span>
+                    <div>
+                      <div className="text-sm font-medium text-foreground">
+                        {exam.subject.name} — {exam.name}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {exam.examType} · {new Date(exam.examDate).toLocaleDateString(dateLocale)}
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
       {tab === 'fees' && (
         <div className="space-y-lg">
           {!canViewFees ? (
@@ -1204,6 +1264,9 @@ export default function StudentDetailPage() {
           </FormField>
           <FormField label={t.students.nationality} htmlFor="editNationality">
             <input id="editNationality" className={inputClass} {...registerEdit('nationality')} />
+          </FormField>
+          <FormField label={t.students.busRoute} htmlFor="editBusRoute">
+            <input id="editBusRoute" className={inputClass} {...registerEdit('busRoute')} />
           </FormField>
           <FormField label={t.students.class} htmlFor="editClassId">
             <select id="editClassId" className={inputClass} {...registerEdit('classId')}>

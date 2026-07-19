@@ -35,6 +35,10 @@ export class CreateStudentDto {
   @IsOptional()
   @IsString()
   nationality?: string;
+
+  @IsOptional()
+  @IsString()
+  busRoute?: string;
 }
 
 export class UpdateStudentDto {
@@ -57,4 +61,8 @@ export class UpdateStudentDto {
   @IsOptional()
   @IsString()
   nationality?: string;
+
+  @IsOptional()
+  @IsString()
+  busRoute?: string;
 }

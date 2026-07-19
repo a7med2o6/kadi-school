@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { SAFE_USER_FIELDS } from '../prisma/safe-user-select';
+import type { AuthenticatedUser } from '../core/types/authenticated-user';
+import { assertCanAccessStudent } from '../students/student-access.util';
 import type { BulkUpsertStudentGradesDto, ListStudentGradesQueryDto } from './dto/student-grade.dto';
 
 const INCLUDE = {
@@ -12,7 +14,10 @@ const INCLUDE = {
 export class StudentGradesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  list(query: ListStudentGradesQueryDto) {
+  async list(query: ListStudentGradesQueryDto, user: AuthenticatedUser) {
+    if (query.studentId) {
+      await assertCanAccessStudent(this.prisma, user, query.studentId);
+    }
     return this.prisma.client.studentGrade.findMany({
       where: { classSubjectId: query.classSubjectId, studentId: query.studentId, term: query.term },
       include: INCLUDE,

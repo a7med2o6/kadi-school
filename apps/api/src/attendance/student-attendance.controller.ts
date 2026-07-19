@@ -1,5 +1,7 @@
 import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { CurrentUser } from '../core/decorators/current-user.decorator';
 import { RequirePermission } from '../core/decorators/require-permission.decorator';
+import type { AuthenticatedUser } from '../core/types/authenticated-user';
 import { StudentAttendanceService } from './student-attendance.service';
 import { BulkUpsertStudentAttendanceDto, ListStudentAttendanceQueryDto } from './dto/student-attendance.dto';
 
@@ -9,8 +11,8 @@ export class StudentAttendanceController {
 
   @Get()
   @RequirePermission('attendance:read')
-  list(@Query() query: ListStudentAttendanceQueryDto) {
-    return this.service.list(query);
+  list(@Query() query: ListStudentAttendanceQueryDto, @CurrentUser() user: AuthenticatedUser) {
+    return this.service.list(query, user);
   }
 
   @Post('bulk')

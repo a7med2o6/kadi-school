@@ -2,6 +2,8 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { unlink } from 'node:fs/promises';
 import { PrismaService } from '../prisma/prisma.service';
 import { SAFE_USER_FIELDS } from '../prisma/safe-user-select';
+import type { AuthenticatedUser } from '../core/types/authenticated-user';
+import { assertCanAccessStudent } from '../students/student-access.util';
 import type { CreateStudentDocumentDto, ListStudentDocumentsQueryDto } from './dto/document.dto';
 
 // filePath is a server-local disk path — internal only, never returned to clients.
@@ -20,7 +22,10 @@ const SELECT = {
 export class DocumentsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  list(query: ListStudentDocumentsQueryDto) {
+  async list(query: ListStudentDocumentsQueryDto, user: AuthenticatedUser) {
+    if (query.studentId) {
+      await assertCanAccessStudent(this.prisma, user, query.studentId);
+    }
     return this.prisma.client.studentDocument.findMany({
       where: { studentId: query.studentId },
       select: SELECT,
@@ -47,14 +52,16 @@ export class DocumentsService {
     });
   }
 
-  async get(id: string) {
+  async get(id: string, user: AuthenticatedUser) {
     const doc = await this.prisma.client.studentDocument.findUnique({ where: { id } });
     if (!doc) throw new NotFoundException('Document not found');
+    await assertCanAccessStudent(this.prisma, user, doc.studentId);
     return doc;
   }
 
   async remove(id: string) {
-    const doc = await this.get(id);
+    const doc = await this.prisma.client.studentDocument.findUnique({ where: { id } });
+    if (!doc) throw new NotFoundException('Document not found');
     await this.prisma.client.studentDocument.delete({ where: { id } });
     await unlink(doc.filePath).catch(() => undefined);
   }

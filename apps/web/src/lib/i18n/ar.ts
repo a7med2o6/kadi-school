@@ -19,6 +19,7 @@ export const ar: Dictionary = {
     upload: 'رفع',
     uploading: 'جارٍ الرفع...',
     download: 'تنزيل',
+    accessDenied: 'ليس لديك صلاحية الوصول لهذه الصفحة.',
     actions: 'إجراءات',
     active: 'نشط',
     inactive: 'غير نشط',
@@ -45,6 +46,7 @@ export const ar: Dictionary = {
     users: 'المستخدمون',
     settings: 'الإعدادات',
     adminPortal: 'بوابة الإدارة',
+    myProfile: 'ملفي',
   },
   auth: {
     welcomeBack: 'مرحبًا بعودتك',
@@ -101,6 +103,7 @@ export const ar: Dictionary = {
     withdrawConfirm: 'سحب قيد {id}؟',
     noGuardian: 'لم يتم ربط ولي أمر بعد',
     nationality: 'الجنسية',
+    busRoute: 'خط الباص',
   },
   studentDetail: {
     breadcrumb: 'الطلاب',
@@ -108,6 +111,7 @@ export const ar: Dictionary = {
     tabOverview: 'نظرة عامة',
     tabGrades: 'الدرجات',
     tabAttendance: 'الحضور',
+    tabExams: 'الاختبارات',
     tabFees: 'الرسوم',
     tabDocuments: 'المستندات',
     personalInfo: 'المعلومات الشخصية',
@@ -122,6 +126,7 @@ export const ar: Dictionary = {
     activityTimeline: 'سجل النشاطات',
     enrolledInClass: 'تم التسجيل في {class}',
     gradesEmpty: 'لم يتم رصد أي درجات لهذا الطالب بعد.',
+    examsEmpty: 'لا توجد اختبارات مجدولة لهذا الفصل بعد.',
     feesEmpty: 'ستظهر الفواتير والمدفوعات هنا بعد إعداد القسم المالي (المرحلة 7).',
     documentsEmpty: 'ستظهر المستندات المرفوعة هنا بعد ربط نظام تخزين الملفات.',
     levelComparison: 'مقارنة المستوى',
@@ -160,6 +165,11 @@ export const ar: Dictionary = {
     documentsFileLabel: 'الملف',
     documentsUploadedBy: 'تم الرفع بواسطة {name}',
     documentsDeleteConfirm: 'حذف "{title}"؟',
+  },
+  myProfile: {
+    selectChildTitle: 'اختر ابنك/ابنتك',
+    selectChildSubtitle: 'اختر الطالب اللي عاوز تشوف بياناته',
+    noChildrenLinked: 'مفيش طلاب مرتبطين بحسابك دلوقتي. تواصل مع إدارة المدرسة.',
   },
   teachers: {
     title: 'المعلمون',

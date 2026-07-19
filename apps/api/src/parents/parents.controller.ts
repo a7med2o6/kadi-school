@@ -1,5 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
+import { CurrentUser } from '../core/decorators/current-user.decorator';
 import { RequirePermission } from '../core/decorators/require-permission.decorator';
+import type { AuthenticatedUser } from '../core/types/authenticated-user';
 import { ParentsService } from './parents.service';
 import { CreateParentDto, UpdateParentDto } from './dto/parent.dto';
 
@@ -11,6 +13,11 @@ export class ParentsController {
   @RequirePermission('parents:read')
   list() {
     return this.service.list();
+  }
+
+  @Get('me/children')
+  getOwnChildren(@CurrentUser() user: AuthenticatedUser) {
+    return this.service.listChildrenForUser(user.id);
   }
 
   @Get(':id')

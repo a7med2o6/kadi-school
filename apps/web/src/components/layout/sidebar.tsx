@@ -14,6 +14,7 @@ import {
   School,
   Settings,
   Star,
+  UserCircle,
   UsersRound,
   BookOpen,
   Users,
@@ -44,6 +45,18 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/users', labelKey: 'users', icon: Users, permission: 'users:read' },
 ];
 
+/**
+ * Student/Parent accounts don't manage the school — they only ever need their
+ * own (or their child's) record. Point them at /me instead of the staff-facing
+ * class/subject-selector Attendance/Grades/Assignments/Exams pages.
+ */
+const SELF_SERVICE_NAV_ITEMS: NavItem[] = [
+  { href: '/dashboard', labelKey: 'dashboard', icon: LayoutDashboard },
+  { href: '/me', labelKey: 'myProfile', icon: UserCircle },
+  { href: '/notifications', labelKey: 'notifications', icon: Bell, permission: 'notifications:read' },
+  { href: '/timetable', labelKey: 'timetable', icon: CalendarDays, permission: 'timetable:read' },
+];
+
 function initials(label: string) {
   return label
     .split(/[\s@.]+/)
@@ -61,7 +74,10 @@ export function Sidebar() {
   const permissions = user?.permissions ?? [];
   const t = useTranslations();
 
-  const items = NAV_ITEMS.filter((item) => !item.permission || permissions.includes(item.permission));
+  const isSelfServiceRole = user?.roles.some((r) => r === 'Student' || r === 'Parent') ?? false;
+  const items = (isSelfServiceRole ? SELF_SERVICE_NAV_ITEMS : NAV_ITEMS).filter(
+    (item) => !item.permission || permissions.includes(item.permission),
+  );
   const identity = user?.email ?? user?.civilId ?? '';
   const role = user?.roles[0] ?? 'User';
 

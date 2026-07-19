@@ -24,6 +24,21 @@ export class ParentsService {
     return parent;
   }
 
+  async listChildrenForUser(userId: string) {
+    const parent = await this.prisma.client.parent.findUnique({ where: { userId } });
+    if (!parent) throw new NotFoundException('Parent not found');
+
+    const links = await this.prisma.client.studentGuardian.findMany({
+      where: { parentId: parent.id },
+      include: { student: { include: { user: { select: SAFE_USER_FIELDS }, class: true } } },
+    });
+    return links.map((link: (typeof links)[number]) => ({
+      ...link.student,
+      relationship: link.relationship,
+      isPrimaryContact: link.isPrimaryContact,
+    }));
+  }
+
   async create(dto: CreateParentDto) {
     const passwordHash = await argon2.hash(dto.password);
 

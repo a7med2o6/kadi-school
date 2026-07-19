@@ -1,5 +1,7 @@
 import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { CurrentUser } from '../core/decorators/current-user.decorator';
 import { RequirePermission } from '../core/decorators/require-permission.decorator';
+import type { AuthenticatedUser } from '../core/types/authenticated-user';
 import { FeesService } from './fees.service';
 import { CreateFeeInvoiceDto, ListFeeInvoicesQueryDto } from './dto/fee.dto';
 
@@ -9,8 +11,8 @@ export class FeesController {
 
   @Get()
   @RequirePermission('finance:read')
-  list(@Query() query: ListFeeInvoicesQueryDto) {
-    return this.service.list(query);
+  list(@Query() query: ListFeeInvoicesQueryDto, @CurrentUser() user: AuthenticatedUser) {
+    return this.service.list(query, user);
   }
 
   @Post()

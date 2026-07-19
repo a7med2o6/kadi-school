@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Post, Query } from '@nestjs/common';
 import { RequirePermission } from '../core/decorators/require-permission.decorator';
 import { ExamsService } from './exams.service';
-import { GenerateExamDto, ListExamsQueryDto } from './dto/exam.dto';
+import { GenerateExamDto, ListExamScheduleQueryDto, ListExamsQueryDto } from './dto/exam.dto';
 
 @Controller('exams')
 export class ExamsController {
@@ -11,6 +11,12 @@ export class ExamsController {
   @RequirePermission('exams:read')
   list(@Query() query: ListExamsQueryDto) {
     return this.service.list(query);
+  }
+
+  @Get('schedule')
+  @RequirePermission('exams:read')
+  schedule(@Query() query: ListExamScheduleQueryDto) {
+    return this.service.schedule(query);
   }
 
   @Get(':id')

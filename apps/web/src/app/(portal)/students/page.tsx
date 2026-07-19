@@ -39,6 +39,7 @@ const studentSchema = z.object({
   admissionNumber: z.string().min(1, 'Required'),
   classId: z.string().optional(),
   nationality: z.string().optional(),
+  busRoute: z.string().optional(),
 });
 type StudentInput = z.infer<typeof studentSchema>;
 
@@ -230,6 +231,10 @@ export default function StudentsPage() {
 
           <FormField label={`${t.students.nationality} (${t.common.optional})`} htmlFor="nationality">
             <input id="nationality" className={inputClass} {...register('nationality')} />
+          </FormField>
+
+          <FormField label={`${t.students.busRoute} (${t.common.optional})`} htmlFor="busRoute">
+            <input id="busRoute" className={inputClass} {...register('busRoute')} />
           </FormField>
 
           {serverError && <p className="mb-md text-sm text-destructive">{serverError}</p>}

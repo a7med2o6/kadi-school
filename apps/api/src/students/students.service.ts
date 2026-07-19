@@ -25,6 +25,12 @@ export class StudentsService {
     return student;
   }
 
+  async getByUserId(userId: string) {
+    const student = await this.prisma.client.student.findUnique({ where: { userId }, include: INCLUDE });
+    if (!student) throw new NotFoundException('Student not found');
+    return student;
+  }
+
   async create(dto: CreateStudentDto) {
     const passwordHash = await argon2.hash(dto.password);
 
@@ -41,6 +47,7 @@ export class StudentsService {
         dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : undefined,
         gender: dto.gender,
         nationality: dto.nationality,
+        busRoute: dto.busRoute,
       },
       include: INCLUDE,
     });
@@ -56,6 +63,7 @@ export class StudentsService {
         dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : undefined,
         gender: dto.gender,
         nationality: dto.nationality,
+        busRoute: dto.busRoute,
       },
       include: INCLUDE,
     });

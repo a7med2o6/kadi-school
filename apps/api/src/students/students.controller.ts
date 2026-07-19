@@ -11,8 +11,12 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { CurrentUser } from '../core/decorators/current-user.decorator';
 import { RequirePermission } from '../core/decorators/require-permission.decorator';
+import type { AuthenticatedUser } from '../core/types/authenticated-user';
 import { localDiskStorage } from '../files/local-storage';
+import { PrismaService } from '../prisma/prisma.service';
+import { assertCanAccessStudent } from './student-access.util';
 import { StudentsService } from './students.service';
 import { CreateStudentDto, UpdateStudentDto } from './dto/student.dto';
 
@@ -20,7 +24,10 @@ const AVATAR_MAX_BYTES = 5 * 1024 * 1024;
 
 @Controller('students')
 export class StudentsController {
-  constructor(private readonly service: StudentsService) {}
+  constructor(
+    private readonly service: StudentsService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   @Get()
   @RequirePermission('students:read')
@@ -28,9 +35,14 @@ export class StudentsController {
     return this.service.list();
   }
 
+  @Get('me')
+  getOwn(@CurrentUser() user: AuthenticatedUser) {
+    return this.service.getByUserId(user.id);
+  }
+
   @Get(':id')
-  @RequirePermission('students:read')
-  get(@Param('id') id: string) {
+  async get(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    await assertCanAccessStudent(this.prisma, user, id);
     return this.service.get(id);
   }
 

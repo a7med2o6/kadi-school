@@ -6,6 +6,12 @@ export class ListExamsQueryDto {
   subjectId?: string;
 }
 
+export class ListExamScheduleQueryDto {
+  @IsOptional()
+  @IsUUID()
+  classId?: string;
+}
+
 export class GenerateExamDto {
   @IsUUID()
   subjectId!: string;

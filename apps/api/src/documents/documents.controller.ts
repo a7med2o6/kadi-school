@@ -28,8 +28,8 @@ export class DocumentsController {
 
   @Get()
   @RequirePermission('documents:read')
-  list(@Query() query: ListStudentDocumentsQueryDto) {
-    return this.service.list(query);
+  list(@Query() query: ListStudentDocumentsQueryDto, @CurrentUser() user: AuthenticatedUser) {
+    return this.service.list(query, user);
   }
 
   @Post()
@@ -51,8 +51,8 @@ export class DocumentsController {
 
   @Get(':id/download')
   @RequirePermission('documents:read')
-  async download(@Param('id') id: string, @Res() res: Response) {
-    const doc = await this.service.get(id);
+  async download(@Param('id') id: string, @Res() res: Response, @CurrentUser() user: AuthenticatedUser) {
+    const doc = await this.service.get(id, user);
     res.download(doc.filePath, doc.fileName);
   }
 

@@ -19,6 +19,7 @@ export const en: Dictionary = {
     upload: 'Upload',
     uploading: 'Uploading...',
     download: 'Download',
+    accessDenied: "You don't have access to this page.",
     actions: 'Actions',
     active: 'Active',
     inactive: 'Inactive',
@@ -45,6 +46,7 @@ export const en: Dictionary = {
     users: 'Users',
     settings: 'Settings',
     adminPortal: 'Admin Portal',
+    myProfile: 'My Profile',
   },
   auth: {
     welcomeBack: 'Welcome back',
@@ -102,6 +104,7 @@ export const en: Dictionary = {
     withdrawConfirm: 'Withdraw {id}?',
     noGuardian: 'No guardian linked yet',
     nationality: 'Nationality',
+    busRoute: 'Bus Route',
   },
   studentDetail: {
     breadcrumb: 'Students',
@@ -109,6 +112,7 @@ export const en: Dictionary = {
     tabOverview: 'Overview',
     tabGrades: 'Grades',
     tabAttendance: 'Attendance',
+    tabExams: 'Exams',
     tabFees: 'Fees',
     tabDocuments: 'Documents',
     personalInfo: 'Personal Information',
@@ -123,6 +127,7 @@ export const en: Dictionary = {
     activityTimeline: 'Activity Timeline',
     enrolledInClass: 'Enrolled in {class}',
     gradesEmpty: 'No grades have been recorded for this student yet.',
+    examsEmpty: 'No exams scheduled for this class yet.',
     feesEmpty: 'Invoices and payments will appear here once Finance is set up (Phase 7).',
     documentsEmpty: 'Uploaded documents will appear here once file storage is wired up.',
     levelComparison: 'Level Comparison',
@@ -161,6 +166,11 @@ export const en: Dictionary = {
     documentsFileLabel: 'File',
     documentsUploadedBy: 'Uploaded by {name}',
     documentsDeleteConfirm: 'Delete "{title}"?',
+  },
+  myProfile: {
+    selectChildTitle: 'Select a child',
+    selectChildSubtitle: 'Choose which of your children you want to view',
+    noChildrenLinked: 'No children are linked to your account yet. Contact the school office.',
   },
   teachers: {
     title: 'Teachers',

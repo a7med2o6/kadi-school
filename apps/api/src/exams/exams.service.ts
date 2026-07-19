@@ -1,13 +1,25 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { QuestionDifficulty } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import type { GenerateExamDto, ListExamsQueryDto } from './dto/exam.dto';
+import type { GenerateExamDto, ListExamsQueryDto, ListExamScheduleQueryDto } from './dto/exam.dto';
 
 const INCLUDE = {
   subject: true,
   class: true,
   examQuestions: { include: { question: true }, orderBy: { order: 'asc' as const } },
 };
+
+// Schedule-only shape — deliberately excludes examQuestions/question content so
+// Student/Parent self-service (exams:read) can see *when* an exam is without
+// seeing the paper itself ahead of time.
+const SCHEDULE_SELECT = {
+  id: true,
+  name: true,
+  examType: true,
+  examDate: true,
+  subject: { select: { name: true } },
+  class: { select: { name: true } },
+} as const;
 
 // Question bank difficulty mix this school targets (45% easy / 35% medium /
 // 20% hard) — the generator samples toward this split rather than picking
@@ -38,6 +50,14 @@ export class ExamsService {
       where: { subjectId: query.subjectId },
       include: INCLUDE,
       orderBy: { examDate: 'desc' },
+    });
+  }
+
+  schedule(query: ListExamScheduleQueryDto) {
+    return this.prisma.client.exam.findMany({
+      where: { classId: query.classId },
+      select: SCHEDULE_SELECT,
+      orderBy: { examDate: 'asc' },
     });
   }
 

@@ -19,6 +19,7 @@ export interface Dictionary {
     upload: string;
     uploading: string;
     download: string;
+    accessDenied: string;
     actions: string;
     active: string;
     inactive: string;
@@ -45,6 +46,7 @@ export interface Dictionary {
     users: string;
     settings: string;
     adminPortal: string;
+    myProfile: string;
   };
   auth: {
     welcomeBack: string;
@@ -101,6 +103,7 @@ export interface Dictionary {
     withdrawConfirm: string;
     noGuardian: string;
     nationality: string;
+    busRoute: string;
   };
   studentDetail: {
     breadcrumb: string;
@@ -108,6 +111,7 @@ export interface Dictionary {
     tabOverview: string;
     tabGrades: string;
     tabAttendance: string;
+    tabExams: string;
     tabFees: string;
     tabDocuments: string;
     personalInfo: string;
@@ -122,6 +126,7 @@ export interface Dictionary {
     activityTimeline: string;
     enrolledInClass: string;
     gradesEmpty: string;
+    examsEmpty: string;
     feesEmpty: string;
     documentsEmpty: string;
     levelComparison: string;
@@ -160,6 +165,11 @@ export interface Dictionary {
     documentsFileLabel: string;
     documentsUploadedBy: string;
     documentsDeleteConfirm: string;
+  };
+  myProfile: {
+    selectChildTitle: string;
+    selectChildSubtitle: string;
+    noChildrenLinked: string;
   };
   teachers: {
     title: string;
