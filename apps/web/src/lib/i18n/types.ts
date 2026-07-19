@@ -32,6 +32,7 @@ export interface Dictionary {
     grades: string;
     assignments: string;
     exams: string;
+    notifications: string;
     classes: string;
     subjects: string;
     timetable: string;
@@ -408,6 +409,30 @@ export interface Dictionary {
     noQuestionsYet: string;
     noExamsYet: string;
     pointsLabel: string;
+  };
+  notifications: {
+    title: string;
+    subtitle: string;
+    markAllRead: string;
+    newAnnouncement: string;
+    composeTitle: string;
+    titleLabel: string;
+    bodyLabel: string;
+    targetType: string;
+    targetRole: string;
+    targetClass: string;
+    targetIndividual: string;
+    selectRole: string;
+    selectClass: string;
+    selectUser: string;
+    send: string;
+    recentlySent: string;
+    sentTo: string;
+    noSentYet: string;
+    myNotifications: string;
+    noNotificationsYet: string;
+    from: string;
+    viewAll: string;
   };
   attendanceReport: {
     title: string;

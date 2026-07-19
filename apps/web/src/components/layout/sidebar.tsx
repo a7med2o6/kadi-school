@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import {
+  Bell,
   CalendarCheck,
   CalendarDays,
   ClipboardList,
@@ -34,6 +35,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/grades', labelKey: 'grades', icon: Star, permission: 'grades:read' },
   { href: '/assignments', labelKey: 'assignments', icon: ClipboardList, permission: 'homework:read' },
   { href: '/exams', labelKey: 'exams', icon: FileQuestion, permission: 'exams:read' },
+  { href: '/notifications', labelKey: 'notifications', icon: Bell, permission: 'notifications:read' },
   { href: '/classes', labelKey: 'classes', icon: School, permission: 'classes:read' },
   { href: '/subjects', labelKey: 'subjects', icon: BookOpen, permission: 'subjects:read' },
   { href: '/timetable', labelKey: 'timetable', icon: CalendarDays, permission: 'timetable:read' },
@@ -70,8 +72,8 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="flex h-screen w-64 flex-col bg-card">
-      <div className="flex items-center gap-2 px-lg py-lg">
+    <aside className="flex h-screen w-64 shrink-0 flex-col bg-card">
+      <div className="flex shrink-0 items-center gap-2 px-lg py-lg">
         <span className="flex h-10 w-10 items-center justify-center rounded-md bg-primary text-primary-foreground">
           <GraduationCap className="h-6 w-6" />
         </span>
@@ -81,7 +83,7 @@ export function Sidebar() {
         </div>
       </div>
 
-      <nav className="flex flex-1 flex-col gap-1 px-sm">
+      <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-sm">
         {items.map((item) => {
           const isActive = pathname === item.href;
           const Icon = item.icon;
@@ -116,7 +118,7 @@ export function Sidebar() {
         </Link>
       </nav>
 
-      <div className="m-sm flex items-center gap-2 rounded bg-muted p-sm">
+      <div className="m-sm flex shrink-0 items-center gap-2 rounded bg-muted p-sm">
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
           {initials(identity) || 'U'}
         </span>

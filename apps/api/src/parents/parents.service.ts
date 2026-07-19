@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import * as argon2 from 'argon2';
 import { PrismaService } from '../prisma/prisma.service';
 import { SAFE_USER_FIELDS } from '../prisma/safe-user-select';
+import { assignDefaultRole } from '../iam/assign-default-role';
 import type { CreateParentDto, UpdateParentDto } from './dto/parent.dto';
 
 const INCLUDE = {
@@ -29,6 +30,7 @@ export class ParentsService {
     const user = await this.prisma.client.user.create({
       data: { email: dto.email, phone: dto.phone, passwordHash },
     });
+    await assignDefaultRole(this.prisma, user.id, 'Parent');
 
     return this.prisma.client.parent.create({
       data: { userId: user.id, occupation: dto.occupation },

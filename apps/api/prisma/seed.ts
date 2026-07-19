@@ -60,6 +60,7 @@ const DEFAULT_ROLES: { name: string; permissions: readonly string[] }[] = [
       'grades:write',
       'homework:write',
       'exams:write',
+      'notifications:read',
     ],
   },
   {

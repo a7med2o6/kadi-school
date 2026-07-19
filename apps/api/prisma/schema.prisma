@@ -56,6 +56,8 @@ model School {
   questions              Question[]
   exams                  Exam[]
   examQuestions          ExamQuestion[]
+  notifications          Notification[]
+  notificationRecipients NotificationRecipient[]
 
   @@map("schools")
 }
@@ -81,6 +83,9 @@ model User {
   student       Student?
   parent        Parent?
   attendanceNotesAuthored StudentAttendanceNote[]
+  notificationsCreated    Notification[]           @relation("NotificationCreatedBy")
+  notificationsTargeted   Notification[]           @relation("NotificationTargetUser")
+  notificationRecipient   NotificationRecipient[]
 
   @@unique([schoolId, email])
   @@unique([schoolId, civilId])
@@ -217,6 +222,7 @@ model Class {
   classSubjects ClassSubject[]
   attendanceRecords StudentAttendance[]
   exams             Exam[]
+  notifications     Notification[]
 
   @@index([schoolId])
   @@index([academicYearId])
@@ -614,4 +620,58 @@ model ExamQuestion {
   @@unique([examId, questionId])
   @@index([schoolId])
   @@map("exam_questions")
+}
+
+enum NotificationTargetType {
+  ROLE
+  CLASS
+  INDIVIDUAL
+
+  @@map("notification_target_type")
+}
+
+/// Tenant-scoped. `targetRoleId` is a plain id (not a Prisma relation) because
+/// Role rows are shared platform defaults with a nullable schoolId — fanning
+/// out to "everyone with this role at this school" is resolved in the service
+/// layer via User.userRoles, not a direct FK walk. Recipients are fanned out
+/// synchronously into NotificationRecipient rows at creation time; no queue —
+/// this school's user counts don't warrant one.
+model Notification {
+  id              String                 @id @default(uuid())
+  schoolId        String                 @map("school_id")
+  school          School                 @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  title           String
+  body            String
+  targetType      NotificationTargetType @map("target_type")
+  targetRoleId    String?                @map("target_role_id")
+  targetClassId   String?                @map("target_class_id")
+  targetClass     Class?                 @relation(fields: [targetClassId], references: [id], onDelete: SetNull)
+  targetUserId    String?                @map("target_user_id")
+  targetUser      User?                  @relation("NotificationTargetUser", fields: [targetUserId], references: [id], onDelete: SetNull)
+  createdByUserId String?                @map("created_by_user_id")
+  createdByUser   User?                  @relation("NotificationCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdAt       DateTime               @default(now()) @map("created_at")
+
+  recipients NotificationRecipient[]
+
+  @@index([schoolId])
+  @@map("notifications")
+}
+
+/// Tenant-scoped. One row per (notification, recipient) — `readAt` is the
+/// per-user read receipt.
+model NotificationRecipient {
+  id             String       @id @default(uuid())
+  schoolId       String       @map("school_id")
+  school         School       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  notificationId String       @map("notification_id")
+  notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  userId         String       @map("user_id")
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  readAt         DateTime?    @map("read_at")
+
+  @@unique([notificationId, userId])
+  @@index([schoolId])
+  @@index([userId, readAt])
+  @@map("notification_recipients")
 }

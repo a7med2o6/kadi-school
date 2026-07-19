@@ -45,11 +45,11 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
   }
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex h-screen overflow-hidden">
       <Sidebar />
-      <div className="flex flex-1 flex-col">
+      <div className="flex flex-1 flex-col overflow-hidden">
         <Topbar />
-        <main className="flex-1 bg-background p-lg">{children}</main>
+        <main className="flex-1 overflow-y-auto bg-background p-lg">{children}</main>
       </div>
     </div>
   );

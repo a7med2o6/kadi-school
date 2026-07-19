@@ -9,6 +9,7 @@ import { CoreModule } from './core/core.module';
 import { ExamsModule } from './exams/exams.module';
 import { GradesModule } from './grades/grades.module';
 import { IamModule } from './iam/iam.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { ParentsModule } from './parents/parents.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { StudentsModule } from './students/students.module';
@@ -38,6 +39,7 @@ import { TimetableModule } from './timetable/timetable.module';
     GradesModule,
     AssignmentsModule,
     ExamsModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
