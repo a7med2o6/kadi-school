@@ -52,6 +52,12 @@ const TENANT_SCOPED_MODELS = [
   'teacherAttendance',
   'teacherLeaveRequest',
   'studentAttendanceNote',
+  'studentGrade',
+  'assignment',
+  'assignmentSubmission',
+  'question',
+  'exam',
+  'examQuestion',
 ] as const;
 
 export const tenantScopingExtension = Prisma.defineExtension({

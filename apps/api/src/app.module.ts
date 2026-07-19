@@ -3,8 +3,11 @@ import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AcademicsModule } from './academics/academics.module';
+import { AssignmentsModule } from './assignments/assignments.module';
 import { AttendanceModule } from './attendance/attendance.module';
 import { CoreModule } from './core/core.module';
+import { ExamsModule } from './exams/exams.module';
+import { GradesModule } from './grades/grades.module';
 import { IamModule } from './iam/iam.module';
 import { ParentsModule } from './parents/parents.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -32,6 +35,9 @@ import { TimetableModule } from './timetable/timetable.module';
     ParentsModule,
     TimetableModule,
     AttendanceModule,
+    GradesModule,
+    AssignmentsModule,
+    ExamsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -23,9 +23,29 @@ interface StudentDetail {
   dateOfBirth: string | null;
   gender: string | null;
   enrollmentDate: string;
-  class: { name: string } | null;
+  class: { id: string; name: string } | null;
   user: { email: string | null; civilId: string | null; phone: string | null };
   guardians: Guardian[];
+}
+
+type GradeComponent = 'QUIZZES' | 'MIDTERM' | 'FINAL' | 'PARTICIPATION';
+const GRADE_COMPONENTS: GradeComponent[] = ['QUIZZES', 'MIDTERM', 'FINAL', 'PARTICIPATION'];
+const GRADE_MAX: Record<GradeComponent, number> = { QUIZZES: 20, MIDTERM: 20, FINAL: 40, PARTICIPATION: 20 };
+interface StudentGradeRow {
+  id: string;
+  studentId: string;
+  classSubjectId: string;
+  component: GradeComponent;
+  score: number;
+  updatedAt: string;
+  classSubject: { subject: { name: string }; class: { name: string } };
+}
+interface Assignment {
+  id: string;
+  title: string;
+  dueAt: string;
+  classSubject: { classId: string; subject: { name: string } };
+  submissions: { studentId: string; submittedAt: string | null }[];
 }
 
 type AttendanceStatusValue = 'PRESENT' | 'LATE' | 'ABSENT' | 'EXCUSED';
@@ -95,6 +115,14 @@ export default function StudentDetailPage() {
     queryFn: () => apiClient.get<AttendanceNote[]>(`/attendance/notes?studentId=${params.id}`),
     enabled: !!params.id,
   });
+  const gradesQuery = useQuery({
+    queryKey: ['grades', 'term-1'],
+    queryFn: () => apiClient.get<StudentGradeRow[]>('/grades?term=1'),
+  });
+  const assignmentsQuery = useQuery({
+    queryKey: ['assignments'],
+    queryFn: () => apiClient.get<Assignment[]>('/assignments'),
+  });
 
   const addNoteMutation = useMutation({
     mutationFn: (body: string) => apiClient.post('/attendance/notes', { studentId: params.id, body }),
@@ -114,6 +142,42 @@ export default function StudentDetailPage() {
   if (isLoading || !student) {
     return <p className="text-sm text-muted-foreground">{t.common.loading}</p>;
   }
+
+  const allGrades = gradesQuery.data ?? [];
+  const studentGrades = allGrades.filter((g) => g.studentId === student.id);
+  const subjectIds = Array.from(new Set(studentGrades.map((g) => g.classSubjectId)));
+
+  const subjectBreakdown = subjectIds.map((classSubjectId) => {
+    const rowsForSubject = studentGrades.filter((g) => g.classSubjectId === classSubjectId);
+    const scores = {} as Record<GradeComponent, number | null>;
+    for (const c of GRADE_COMPONENTS) scores[c] = rowsForSubject.find((g) => g.component === c)?.score ?? null;
+    const total = GRADE_COMPONENTS.reduce((sum, c) => sum + (scores[c] ?? 0), 0);
+    const subjectName = rowsForSubject[0]?.classSubject.subject.name ?? '';
+
+    const classmateTotals = new Map<string, number>();
+    for (const g of allGrades.filter((g) => g.classSubjectId === classSubjectId)) {
+      classmateTotals.set(g.studentId, (classmateTotals.get(g.studentId) ?? 0) + g.score);
+    }
+    const classAverageForSubject =
+      classmateTotals.size > 0 ? Array.from(classmateTotals.values()).reduce((a, b) => a + b, 0) / classmateTotals.size : null;
+
+    return { classSubjectId, subjectName, scores, total, classAverageForSubject };
+  });
+
+  const studentAverage =
+    subjectBreakdown.length > 0 ? Math.round(subjectBreakdown.reduce((sum, s) => sum + s.total, 0) / subjectBreakdown.length) : null;
+  const classAveragesWithData = subjectBreakdown.map((s) => s.classAverageForSubject).filter((v): v is number => v !== null);
+  const classAverage =
+    classAveragesWithData.length > 0 ? Math.round(classAveragesWithData.reduce((a, b) => a + b, 0) / classAveragesWithData.length) : null;
+
+  const latestGrades = [...studentGrades].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 5);
+
+  const upcomingTasks = (assignmentsQuery.data ?? [])
+    .filter((a) => a.classSubject.classId === student.class?.id)
+    .filter((a) => new Date(a.dueAt).getTime() > Date.now())
+    .filter((a) => !a.submissions.some((s) => s.studentId === student.id && s.submittedAt))
+    .sort((a, b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime())
+    .slice(0, 3);
 
   const label = student.user.email ?? student.user.civilId ?? student.admissionNumber;
   const primaryGuardian = student.guardians.find((g) => g.isPrimaryContact) ?? student.guardians[0];
@@ -242,16 +306,22 @@ export default function StudentDetailPage() {
 
           <div className="space-y-lg lg:col-span-2">
             <div className="grid grid-cols-2 gap-md">
-              <div className="rounded-lg border border-border bg-card p-lg shadow-ambient">
+              <button
+                type="button"
+                onClick={() => setTab('grades')}
+                className="cursor-pointer rounded-lg border border-border bg-card p-lg text-start shadow-ambient transition-colors hover:bg-accent"
+              >
                 <div className="mb-2 flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">{t.studentDetail.gpaScore}</span>
                   <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary">
                     <TrendingUp className="h-4 w-4" />
                   </span>
                 </div>
-                <div className="text-2xl font-bold text-muted-foreground">—</div>
-                <p className="text-xs text-muted-foreground">{t.studentDetail.gpaPlaceholder}</p>
-              </div>
+                <div className="text-2xl font-bold text-foreground">{studentAverage !== null ? `${studentAverage}%` : '—'}</div>
+                <p className="text-xs text-muted-foreground">
+                  {studentAverage !== null ? t.studentDetail.subjectBreakdown : t.studentDetail.gpaPlaceholder}
+                </p>
+              </button>
               <button
                 type="button"
                 onClick={() => setTab('attendance')}
@@ -292,7 +362,143 @@ export default function StudentDetailPage() {
         </div>
       )}
 
-      {tab === 'grades' && <EmptyTab icon={TrendingUp} message={t.studentDetail.gradesEmpty} />}
+      {tab === 'grades' && (
+        <div className="space-y-lg">
+          {subjectBreakdown.length === 0 ? (
+            <EmptyTab icon={TrendingUp} message={t.studentDetail.gradesEmpty} />
+          ) : (
+            <>
+              <div className="grid grid-cols-1 gap-lg lg:grid-cols-3">
+                <div className="rounded-lg border border-border bg-card p-lg shadow-ambient">
+                  <h2 className="mb-1 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                    {t.studentDetail.levelComparison}
+                  </h2>
+                  <p className="mb-md text-xs text-muted-foreground">{t.studentDetail.levelComparisonDesc}</p>
+                  <div className="space-y-sm">
+                    <div>
+                      <div className="mb-1 flex justify-between text-sm text-foreground">
+                        <span>{t.studentDetail.studentAverageLabel}</span>
+                        <span className="font-semibold">{studentAverage}%</span>
+                      </div>
+                      <div className="h-2 overflow-hidden rounded-full bg-primary/15">
+                        <div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(100, studentAverage ?? 0)}%` }} />
+                      </div>
+                    </div>
+                    {classAverage !== null && (
+                      <div>
+                        <div className="mb-1 flex justify-between text-sm text-foreground">
+                          <span>{t.studentDetail.classAverageLabel}</span>
+                          <span className="font-semibold">{classAverage}%</span>
+                        </div>
+                        <div className="h-2 overflow-hidden rounded-full bg-muted">
+                          <div className="h-full rounded-full bg-muted-foreground/40" style={{ width: `${Math.min(100, classAverage)}%` }} />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  {studentAverage !== null && classAverage !== null && (
+                    <p className="mt-md rounded-md bg-accent/40 p-sm text-xs text-foreground">
+                      {interpolate(
+                        studentAverage >= classAverage ? t.studentDetail.aboveClassAverage : t.studentDetail.belowClassAverage,
+                        { points: Math.abs(studentAverage - classAverage) },
+                      )}
+                    </p>
+                  )}
+                </div>
+
+                <div className="rounded-lg border border-border bg-card p-lg shadow-ambient">
+                  <h2 className="mb-md text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                    {t.studentDetail.latestGrades}
+                  </h2>
+                  {latestGrades.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">{t.studentDetail.noGradesYet}</p>
+                  ) : (
+                    <ul className="space-y-sm">
+                      {latestGrades.map((g) => (
+                        <li key={g.id} className="flex items-center justify-between text-sm">
+                          <span className="text-foreground">
+                            {g.classSubject.subject.name} — {t.grades[g.component === 'QUIZZES' ? 'quizzes' : g.component === 'MIDTERM' ? 'midterm' : g.component === 'FINAL' ? 'final' : 'participation']}
+                          </span>
+                          <span className="font-medium text-foreground">
+                            {g.score}/{GRADE_MAX[g.component]}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+
+                <div className="rounded-lg border border-border bg-card p-lg shadow-ambient">
+                  <h2 className="mb-md text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                    {t.studentDetail.upcomingTasks}
+                  </h2>
+                  {upcomingTasks.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">{t.studentDetail.noUpcomingTasks}</p>
+                  ) : (
+                    <ul className="space-y-sm">
+                      {upcomingTasks.map((a) => (
+                        <li key={a.id} className="text-sm">
+                          <div className="font-medium text-foreground">{a.title}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {a.classSubject.subject.name} · {new Date(a.dueAt).toLocaleDateString(dateLocale)}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-border bg-card p-lg shadow-ambient">
+                <h2 className="mb-md text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                  {t.studentDetail.subjectBreakdown}
+                </h2>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-start text-sm">
+                    <thead className="border-b border-border text-muted-foreground">
+                      <tr>
+                        <th className="whitespace-nowrap px-md py-sm text-start font-medium">{t.grades.studentName}</th>
+                        <th className="whitespace-nowrap px-md py-sm text-start font-medium">{t.grades.quizzes}</th>
+                        <th className="whitespace-nowrap px-md py-sm text-start font-medium">{t.grades.midterm}</th>
+                        <th className="whitespace-nowrap px-md py-sm text-start font-medium">{t.grades.final}</th>
+                        <th className="whitespace-nowrap px-md py-sm text-start font-medium">{t.grades.participation}</th>
+                        <th className="whitespace-nowrap px-md py-sm text-start font-medium">{t.grades.total}</th>
+                        <th className="whitespace-nowrap px-md py-sm text-start font-medium">{t.grades.statusLabel}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {subjectBreakdown.map((s) => {
+                        const status =
+                          s.total >= 90
+                            ? { label: t.grades.statusExcellent, className: 'bg-success/10 text-success' }
+                            : s.total >= 80
+                              ? { label: t.grades.statusVeryGood, className: 'bg-primary/10 text-primary' }
+                              : s.total >= 60
+                                ? { label: t.grades.statusGood, className: 'bg-tertiary/10 text-tertiary' }
+                                : { label: t.grades.statusNeedsImprovement, className: 'bg-destructive/10 text-destructive' };
+                        return (
+                          <tr key={s.classSubjectId} className="border-b border-border last:border-0">
+                            <td className="whitespace-nowrap px-md py-sm font-medium text-foreground">{s.subjectName}</td>
+                            {GRADE_COMPONENTS.map((c) => (
+                              <td key={c} className="whitespace-nowrap px-md py-sm text-foreground">
+                                {s.scores[c] ?? '—'}
+                              </td>
+                            ))}
+                            <td className="whitespace-nowrap px-md py-sm font-semibold text-foreground">{s.total}</td>
+                            <td className="whitespace-nowrap px-md py-sm">
+                              <span className={`rounded-full px-sm py-0.5 text-xs font-medium ${status.className}`}>{status.label}</span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {tab === 'attendance' && (
         <div className="space-y-lg">

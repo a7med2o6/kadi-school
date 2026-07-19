@@ -50,6 +50,12 @@ model School {
   teacherAttendances    TeacherAttendance[]
   teacherLeaveRequests  TeacherLeaveRequest[]
   studentAttendanceNotes StudentAttendanceNote[]
+  studentGrades          StudentGrade[]
+  assignments            Assignment[]
+  assignmentSubmissions  AssignmentSubmission[]
+  questions              Question[]
+  exams                  Exam[]
+  examQuestions          ExamQuestion[]
 
   @@map("schools")
 }
@@ -210,6 +216,7 @@ model Class {
   students      Student[]
   classSubjects ClassSubject[]
   attendanceRecords StudentAttendance[]
+  exams             Exam[]
 
   @@index([schoolId])
   @@index([academicYearId])
@@ -224,6 +231,8 @@ model Subject {
   code     String
 
   classSubjects ClassSubject[]
+  questions     Question[]
+  exams         Exam[]
 
   @@unique([schoolId, code])
   @@index([schoolId])
@@ -242,6 +251,8 @@ model ClassSubject {
   teacher   Teacher? @relation(fields: [teacherId], references: [id], onDelete: SetNull)
 
   timetableSlots TimetableSlot[]
+  grades         StudentGrade[]
+  assignments    Assignment[]
 
   @@unique([classId, subjectId])
   @@index([schoolId])
@@ -318,6 +329,8 @@ model Student {
   guardians StudentGuardian[]
   attendanceRecords StudentAttendance[]
   attendanceNotes   StudentAttendanceNote[]
+  grades            StudentGrade[]
+  submissions       AssignmentSubmission[]
 
   @@unique([schoolId, admissionNumber])
   @@index([schoolId])
@@ -463,4 +476,142 @@ model StudentAttendanceNote {
   @@index([schoolId])
   @@index([studentId])
   @@map("student_attendance_notes")
+}
+
+enum GradeComponent {
+  QUIZZES
+  MIDTERM
+  FINAL
+  PARTICIPATION
+
+  @@map("grade_component")
+}
+
+/// Tenant-scoped. One row per student per class-subject per term per grade
+/// component. Component max scores (quizzes 20, midterm 20, final 40,
+/// participation 20 — summing to 100) are fixed constants shared by the API
+/// and web app, not a configurable per-subject weighting scheme.
+model StudentGrade {
+  id             String         @id @default(uuid())
+  schoolId       String         @map("school_id")
+  school         School         @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  studentId      String         @map("student_id")
+  student        Student        @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  classSubjectId String         @map("class_subject_id")
+  classSubject   ClassSubject   @relation(fields: [classSubjectId], references: [id], onDelete: Cascade)
+  term           String
+  component      GradeComponent
+  score          Float
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  @@unique([studentId, classSubjectId, term, component])
+  @@index([schoolId])
+  @@index([classSubjectId, term])
+  @@map("student_grades")
+}
+
+/// Tenant-scoped. A teacher-created assignment for a class-subject.
+model Assignment {
+  id             String       @id @default(uuid())
+  schoolId       String       @map("school_id")
+  school         School       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  classSubjectId String       @map("class_subject_id")
+  classSubject   ClassSubject @relation(fields: [classSubjectId], references: [id], onDelete: Cascade)
+  title          String
+  description    String?
+  dueAt          DateTime     @map("due_at")
+  maxScore       Float        @default(20) @map("max_score")
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  submissions AssignmentSubmission[]
+
+  @@index([schoolId])
+  @@map("assignments")
+}
+
+/// Tenant-scoped. Recorded by a teacher/admin on a student's behalf — there is
+/// no separate student-facing portal in this app, so submission state is
+/// entered the same way attendance is: by staff, not self-service.
+model AssignmentSubmission {
+  id           String     @id @default(uuid())
+  schoolId     String     @map("school_id")
+  school       School     @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  assignmentId String     @map("assignment_id")
+  assignment   Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  studentId    String     @map("student_id")
+  student      Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  submittedAt  DateTime?  @map("submitted_at")
+  score        Float?
+  feedback     String?
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+
+  @@unique([assignmentId, studentId])
+  @@index([schoolId])
+  @@map("assignment_submissions")
+}
+
+enum QuestionDifficulty {
+  EASY
+  MEDIUM
+  HARD
+
+  @@map("question_difficulty")
+}
+
+/// Tenant-scoped. A single question bank entry for a subject.
+model Question {
+  id         String             @id @default(uuid())
+  schoolId   String             @map("school_id")
+  school     School             @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  subjectId  String             @map("subject_id")
+  subject    Subject            @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  body       String
+  difficulty QuestionDifficulty
+  points     Float              @default(1)
+  createdAt  DateTime           @default(now()) @map("created_at")
+
+  examQuestions ExamQuestion[]
+
+  @@index([schoolId])
+  @@index([subjectId])
+  @@map("questions")
+}
+
+/// Tenant-scoped. `examDate` in the future = scheduled, past = completed —
+/// derived by the API/web app rather than stored, so it can never drift from
+/// reality.
+model Exam {
+  id        String   @id @default(uuid())
+  schoolId  String   @map("school_id")
+  school    School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  subjectId String   @map("subject_id")
+  subject   Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  classId   String?  @map("class_id")
+  class     Class?   @relation(fields: [classId], references: [id], onDelete: SetNull)
+  name      String
+  examType  String   @map("exam_type")
+  examDate  DateTime @map("exam_date")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  examQuestions ExamQuestion[]
+
+  @@index([schoolId])
+  @@map("exams")
+}
+
+/// Tenant-scoped join table between Exam and Question.
+model ExamQuestion {
+  id         String   @id @default(uuid())
+  schoolId   String   @map("school_id")
+  school     School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  examId     String   @map("exam_id")
+  exam       Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
+  questionId String   @map("question_id")
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  order      Int
+
+  @@unique([examId, questionId])
+  @@index([schoolId])
+  @@map("exam_questions")
 }

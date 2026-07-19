@@ -32,6 +32,8 @@ const PERMISSIONS = [
   { key: 'grades:write', module: 'grades', description: 'Enter/edit grades' },
   { key: 'homework:read', module: 'homework', description: 'View homework' },
   { key: 'homework:write', module: 'homework', description: 'Create/grade homework' },
+  { key: 'exams:read', module: 'exams', description: 'View the question bank and exams' },
+  { key: 'exams:write', module: 'exams', description: 'Create questions and exams' },
   { key: 'notifications:read', module: 'notifications', description: 'View notifications' },
   { key: 'notifications:write', module: 'notifications', description: 'Send notifications/announcements' },
   { key: 'finance:read', module: 'finance', description: 'View invoices/payments' },
@@ -57,6 +59,7 @@ const DEFAULT_ROLES: { name: string; permissions: readonly string[] }[] = [
       'attendance:write',
       'grades:write',
       'homework:write',
+      'exams:write',
     ],
   },
   {
