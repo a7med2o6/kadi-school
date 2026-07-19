@@ -5,6 +5,12 @@ import { SAFE_USER_FIELDS } from '../prisma/safe-user-select';
 import type { CreateTeacherDto, UpdateTeacherDto } from './dto/teacher.dto';
 
 const INCLUDE = { user: { select: SAFE_USER_FIELDS } } as const;
+const DETAIL_INCLUDE = {
+  user: { select: SAFE_USER_FIELDS },
+  classSubjects: {
+    include: { subject: true, class: true, timetableSlots: true },
+  },
+} as const;
 
 @Injectable()
 export class TeachersService {
@@ -15,7 +21,7 @@ export class TeachersService {
   }
 
   async get(id: string) {
-    const teacher = await this.prisma.client.teacher.findUnique({ where: { id }, include: INCLUDE });
+    const teacher = await this.prisma.client.teacher.findUnique({ where: { id }, include: DETAIL_INCLUDE });
     if (!teacher) throw new NotFoundException('Teacher not found');
     return teacher;
   }

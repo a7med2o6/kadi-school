@@ -13,6 +13,7 @@ export class ClassesService {
         gradeLevel: true,
         academicYear: true,
         homeroomTeacher: { include: { user: { select: SAFE_USER_FIELDS } } },
+        _count: { select: { students: true } },
       },
       orderBy: { name: 'asc' },
     });
@@ -25,6 +26,7 @@ export class ClassesService {
         gradeLevel: true,
         academicYear: true,
         homeroomTeacher: { include: { user: { select: SAFE_USER_FIELDS } } },
+        _count: { select: { students: true } },
       },
     });
     if (!klass) throw new NotFoundException('Class not found');

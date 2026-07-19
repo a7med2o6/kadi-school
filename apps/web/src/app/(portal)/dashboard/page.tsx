@@ -15,6 +15,9 @@ import {
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { useAuthStore, hasPermission } from '@/stores/auth-store';
+import { useTranslations } from '@/lib/i18n/use-translations';
+import { useLocaleStore } from '@/stores/locale-store';
+import { interpolate } from '@/lib/i18n';
 
 interface Student {
   id: string;
@@ -35,24 +38,6 @@ interface Subject {
   id: string;
 }
 
-function greeting() {
-  const hour = new Date().getHours();
-  if (hour < 12) return 'Good morning';
-  if (hour < 18) return 'Good afternoon';
-  return 'Good evening';
-}
-
-function relativeTime(iso: string) {
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const minutes = Math.round(diffMs / 60_000);
-  if (minutes < 1) return 'just now';
-  if (minutes < 60) return `${minutes} min${minutes === 1 ? '' : 's'} ago`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
-  const days = Math.round(hours / 24);
-  return `${days} day${days === 1 ? '' : 's'} ago`;
-}
-
 const STAT_ICON_STYLES = [
   'bg-primary/10 text-primary',
   'bg-secondary/10 text-secondary',
@@ -62,7 +47,26 @@ const STAT_ICON_STYLES = [
 
 export default function DashboardPage() {
   const user = useAuthStore((s) => s.user);
+  const locale = useLocaleStore((s) => s.locale);
+  const t = useTranslations();
   const name = user?.email?.split('@')[0] ?? user?.civilId ?? 'there';
+
+  function greeting() {
+    const hour = new Date().getHours();
+    if (hour < 12) return t.dashboard.greetingMorning;
+    if (hour < 18) return t.dashboard.greetingAfternoon;
+    return t.dashboard.greetingEvening;
+  }
+
+  function relativeTime(iso: string) {
+    const diffMs = Date.now() - new Date(iso).getTime();
+    const minutes = Math.round(diffMs / 60_000);
+    const rtf = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' });
+    if (minutes < 60) return rtf.format(-minutes, 'minute');
+    const hours = Math.round(minutes / 60);
+    if (hours < 24) return rtf.format(-hours, 'hour');
+    return rtf.format(-Math.round(hours / 24), 'day');
+  }
 
   const studentsQuery = useQuery({ queryKey: ['students'], queryFn: () => apiClient.get<Student[]>('/students') });
   const teachersQuery = useQuery({ queryKey: ['teachers'], queryFn: () => apiClient.get<Teacher[]>('/teachers') });
@@ -70,14 +74,14 @@ export default function DashboardPage() {
   const subjectsQuery = useQuery({ queryKey: ['subjects'], queryFn: () => apiClient.get<Subject[]>('/subjects') });
 
   const stats = [
-    { label: 'Total Students', value: studentsQuery.data?.length, icon: GraduationCap },
-    { label: 'Total Teachers', value: teachersQuery.data?.length, icon: UsersRound },
-    { label: 'Total Classes', value: classesQuery.data?.length, icon: School },
-    { label: 'Total Subjects', value: subjectsQuery.data?.length, icon: BookOpen },
+    { label: t.dashboard.totalStudents, value: studentsQuery.data?.length, icon: GraduationCap },
+    { label: t.dashboard.totalTeachers, value: teachersQuery.data?.length, icon: UsersRound },
+    { label: t.dashboard.totalClasses, value: classesQuery.data?.length, icon: School },
+    { label: t.dashboard.totalSubjects, value: subjectsQuery.data?.length, icon: BookOpen },
   ];
 
   const studentsByClass = (studentsQuery.data ?? []).reduce<Record<string, number>>((acc, s) => {
-    const key = s.class?.name ?? 'Unassigned';
+    const key = s.class?.name ?? t.students.unassigned;
     acc[key] = (acc[key] ?? 0) + 1;
     return acc;
   }, {});
@@ -85,13 +89,13 @@ export default function DashboardPage() {
 
   const recentActivity = [
     ...(studentsQuery.data ?? []).map((s) => ({
-      text: `New student ${s.user.email ?? s.user.civilId} was enrolled`,
+      text: interpolate(t.dashboard.enrolledText, { name: s.user.email ?? s.user.civilId ?? '' }),
       at: s.createdAt,
       icon: UserPlus,
     })),
-    ...(teachersQuery.data ?? []).map((t) => ({
-      text: `New teacher ${t.user.email} joined`,
-      at: t.createdAt,
+    ...(teachersQuery.data ?? []).map((tc) => ({
+      text: interpolate(t.dashboard.joinedText, { name: tc.user.email ?? '' }),
+      at: tc.createdAt,
       icon: GraduationCap,
     })),
   ]
@@ -99,9 +103,9 @@ export default function DashboardPage() {
     .slice(0, 5);
 
   const quickActions = [
-    { href: '/students', label: 'Add Student', description: 'Enroll a new student to a class', icon: UserPlus, permission: 'students:write' },
-    { href: '/teachers', label: 'Add Teacher', description: 'Onboard a new staff member', icon: GraduationCap, permission: 'teachers:write' },
-    { href: '/timetable', label: 'Build Timetable', description: 'Schedule classes for the week', icon: CalendarPlus, permission: 'timetable:write' },
+    { href: '/students', label: t.students.addStudent, description: t.dashboard.addStudentDesc, icon: UserPlus, permission: 'students:write' },
+    { href: '/teachers', label: t.teachers.addTeacher, description: t.dashboard.addTeacherDesc, icon: GraduationCap, permission: 'teachers:write' },
+    { href: '/timetable', label: t.timetable.newSlot, description: t.dashboard.buildTimetableDesc, icon: CalendarPlus, permission: 'timetable:write' },
   ].filter((a) => hasPermission(a.permission));
 
   return (
@@ -112,8 +116,14 @@ export default function DashboardPage() {
             {greeting()}, {name} 👋
           </h1>
           <p className="text-sm text-muted-foreground">
-            Here&apos;s what&apos;s happening at {user?.schoolSlug} today,{' '}
-            {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}.
+            {interpolate(t.dashboard.subtitle, {
+              school: user?.schoolSlug ?? '',
+              date: new Date().toLocaleDateString(locale === 'ar' ? 'ar-EG' : 'en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+              }),
+            })}
           </p>
         </div>
       </div>
@@ -132,13 +142,13 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-1 gap-lg lg:grid-cols-3">
         <div className="rounded-lg border border-border bg-card p-lg shadow-ambient lg:col-span-2">
-          <h2 className="text-lg font-bold text-foreground">Students by Class</h2>
-          <p className="mb-lg text-sm text-muted-foreground">Current enrollment distribution</p>
+          <h2 className="text-lg font-bold text-foreground">{t.dashboard.studentsByClass}</h2>
+          <p className="mb-lg text-sm text-muted-foreground">{t.dashboard.currentEnrollment}</p>
 
           {Object.keys(studentsByClass).length === 0 ? (
             <div className="flex h-48 flex-col items-center justify-center text-center text-muted-foreground">
               <BarChart3 className="mb-2 h-8 w-8" />
-              <p className="text-sm">No students enrolled yet</p>
+              <p className="text-sm">{t.dashboard.noStudentsYet}</p>
             </div>
           ) : (
             <div className="flex h-48 items-end gap-md">
@@ -157,18 +167,18 @@ export default function DashboardPage() {
         </div>
 
         <div className="rounded-lg border border-border bg-card p-lg shadow-ambient">
-          <h2 className="text-lg font-bold text-foreground">Grade Distribution</h2>
-          <p className="mb-lg text-sm text-muted-foreground">Weekly performance overview</p>
+          <h2 className="text-lg font-bold text-foreground">{t.dashboard.gradeDistribution}</h2>
+          <p className="mb-lg text-sm text-muted-foreground">{t.dashboard.weeklyOverview}</p>
           <div className="flex h-40 flex-col items-center justify-center text-center text-muted-foreground">
             <CalendarClock className="mb-2 h-8 w-8" />
-            <p className="text-sm">Grades will appear once exams are recorded</p>
+            <p className="text-sm">{t.dashboard.gradesPlaceholder}</p>
           </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 gap-lg lg:grid-cols-3">
         <div className="space-y-md lg:col-span-2">
-          <h2 className="text-lg font-bold text-foreground">Quick Actions</h2>
+          <h2 className="text-lg font-bold text-foreground">{t.dashboard.quickActions}</h2>
           {quickActions.map((action) => (
             <Link
               key={action.href}
@@ -188,9 +198,9 @@ export default function DashboardPage() {
         </div>
 
         <div className="rounded-lg border border-border bg-card p-lg shadow-ambient">
-          <h2 className="mb-md text-lg font-bold text-foreground">Recent Activity</h2>
+          <h2 className="mb-md text-lg font-bold text-foreground">{t.dashboard.recentActivity}</h2>
           {recentActivity.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nothing yet — activity shows up here as your school fills in.</p>
+            <p className="text-sm text-muted-foreground">{t.dashboard.noActivity}</p>
           ) : (
             <ul className="space-y-md">
               {recentActivity.map((item, i) => (

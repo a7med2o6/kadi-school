@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { Search } from 'lucide-react';
+import { useTranslations } from '@/lib/i18n/use-translations';
 
 export interface DataTableColumn<T> {
   key: string;
@@ -28,10 +29,11 @@ export function DataTable<T>({
   isLoading,
   error,
   getSearchText,
-  searchPlaceholder = 'Search…',
-  emptyLabel = 'No records yet',
+  searchPlaceholder,
+  emptyLabel,
   rowActions,
 }: DataTableProps<T>) {
+  const t = useTranslations();
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
 
@@ -47,35 +49,35 @@ export function DataTable<T>({
   return (
     <div className="space-y-md">
       <div className="relative max-w-xs">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <input
           value={search}
           onChange={(e) => {
             setSearch(e.target.value);
             setPage(0);
           }}
-          placeholder={searchPlaceholder}
-          className="w-full rounded-md border border-input bg-background py-sm pl-9 pr-md text-sm text-foreground outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
+          placeholder={searchPlaceholder ?? t.common.search}
+          className="w-full rounded-md border border-input bg-background py-sm ps-9 pe-md text-sm text-foreground outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
         />
       </div>
 
       <div className="overflow-x-auto rounded-lg border border-border bg-card shadow-ambient">
-        <table className="w-full text-left text-sm">
+        <table className="w-full text-start text-sm">
           <thead className="border-b border-border text-muted-foreground">
             <tr>
               {columns.map((col) => (
-                <th key={col.key} className="whitespace-nowrap px-md py-sm font-medium">
+                <th key={col.key} className="whitespace-nowrap px-md py-sm text-start font-medium">
                   {col.label}
                 </th>
               ))}
-              {rowActions && <th className="px-md py-sm font-medium">Actions</th>}
+              {rowActions && <th className="px-md py-sm text-start font-medium">{t.common.actions}</th>}
             </tr>
           </thead>
           <tbody>
             {isLoading && (
               <tr>
                 <td colSpan={columns.length + 1} className="px-md py-md text-muted-foreground">
-                  Loading…
+                  {t.common.loading}
                 </td>
               </tr>
             )}
@@ -89,7 +91,7 @@ export function DataTable<T>({
             {!isLoading && !error && pageRows.length === 0 && (
               <tr>
                 <td colSpan={columns.length + 1} className="px-md py-md text-muted-foreground">
-                  {emptyLabel}
+                  {emptyLabel ?? t.common.noRecords}
                 </td>
               </tr>
             )}
@@ -110,7 +112,8 @@ export function DataTable<T>({
       {filtered.length > 0 && (
         <div className="flex items-center justify-between text-sm text-muted-foreground">
           <span>
-            Showing {page * PAGE_SIZE + 1}-{Math.min(filtered.length, (page + 1) * PAGE_SIZE)} of {filtered.length}
+            {t.common.showing} {page * PAGE_SIZE + 1}-{Math.min(filtered.length, (page + 1) * PAGE_SIZE)} {t.common.of}{' '}
+            {filtered.length}
           </span>
           {pageCount > 1 && (
             <div className="flex gap-2">
@@ -120,7 +123,7 @@ export function DataTable<T>({
                 onClick={() => setPage((p) => p - 1)}
                 className="cursor-pointer rounded border border-border px-sm py-1 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Previous
+                {t.common.previous}
               </button>
               <button
                 type="button"
@@ -128,7 +131,7 @@ export function DataTable<T>({
                 onClick={() => setPage((p) => p + 1)}
                 className="cursor-pointer rounded border border-border px-sm py-1 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Next
+                {t.common.next}
               </button>
             </div>
           )}

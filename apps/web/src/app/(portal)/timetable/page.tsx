@@ -10,8 +10,7 @@ import { apiClient, ApiError } from '@/lib/api-client';
 import { Dialog } from '@/components/ui/dialog';
 import { FormField, inputClass } from '@/components/ui/form-field';
 import { hasPermission } from '@/stores/auth-store';
-
-const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+import { useTranslations } from '@/lib/i18n/use-translations';
 
 interface SchoolClass {
   id: string;
@@ -51,6 +50,8 @@ export default function TimetablePage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
   const canWrite = hasPermission('timetable:write');
+  const t = useTranslations();
+  const DAYS = t.timetable.days;
 
   const classesQuery = useQuery({ queryKey: ['classes'], queryFn: () => apiClient.get<SchoolClass[]>('/classes') });
   const classSubjectsQuery = useQuery({
@@ -96,7 +97,7 @@ export default function TimetablePage() {
   return (
     <div className="space-y-lg">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Timetable</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">{t.timetable.title}</h1>
         {canWrite && (
           <button
             type="button"
@@ -107,7 +108,7 @@ export default function TimetablePage() {
             className="inline-flex cursor-pointer items-center gap-1 rounded-md bg-primary px-md py-sm text-sm font-medium text-primary-foreground transition-colors hover:opacity-90"
           >
             <Plus className="h-4 w-4" />
-            New Slot
+            {t.timetable.newSlot}
           </button>
         )}
       </div>
@@ -127,12 +128,12 @@ export default function TimetablePage() {
       </div>
 
       <div className="overflow-x-auto rounded-lg border border-border bg-card shadow-ambient">
-        <table className="w-full text-left text-sm">
+        <table className="w-full text-start text-sm">
           <thead className="border-b border-border text-muted-foreground">
             <tr>
-              <th className="whitespace-nowrap px-md py-sm font-medium">Time</th>
+              <th className="whitespace-nowrap px-md py-sm text-start font-medium">{t.timetable.time}</th>
               {DAYS.map((d) => (
-                <th key={d} className="whitespace-nowrap px-md py-sm font-medium">
+                <th key={d} className="whitespace-nowrap px-md py-sm text-start font-medium">
                   {d}
                 </th>
               ))}
@@ -142,13 +143,15 @@ export default function TimetablePage() {
             {timeRows.length === 0 && (
               <tr>
                 <td colSpan={DAYS.length + 1} className="px-md py-md text-muted-foreground">
-                  No slots scheduled for this class yet
+                  {t.timetable.noSlotsYet}
                 </td>
               </tr>
             )}
             {timeRows.map((range) => (
               <tr key={range} className="border-b border-border last:border-0">
-                <td className="whitespace-nowrap px-md py-sm font-medium text-foreground">{range}</td>
+                <td className="whitespace-nowrap px-md py-sm font-medium text-foreground">
+                  <span dir="ltr">{range}</span>
+                </td>
                 {DAYS.map((_, dayIndex) => {
                   const slot = slotsForClass.find((s) => `${s.startTime}-${s.endTime}` === range && s.dayOfWeek === dayIndex);
                   return (
@@ -156,8 +159,10 @@ export default function TimetablePage() {
                       {slot && (
                         <div className="rounded-md bg-accent p-2 text-xs">
                           <div className="font-medium text-accent-foreground">{slot.classSubject.subject.name}</div>
-                          <div className="text-muted-foreground">{slot.classSubject.teacher?.user.email ?? 'No teacher'}</div>
-                          {slot.room && <div className="text-muted-foreground">Room {slot.room}</div>}
+                          <div className="text-muted-foreground">
+                            {slot.classSubject.teacher?.user.email ?? t.teachers.noSubjects}
+                          </div>
+                          {slot.room && <div className="text-muted-foreground">{slot.room}</div>}
                           {canWrite && (
                             <button
                               type="button"
@@ -179,16 +184,16 @@ export default function TimetablePage() {
         </table>
       </div>
 
-      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} title="New Timetable Slot">
+      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} title={t.timetable.newSlot}>
         <form
           onSubmit={handleSubmit((data) => {
             setServerError(null);
             createSlot.mutate(data);
           })}
         >
-          <FormField label="Subject (for selected class)" htmlFor="classSubjectId" error={errors.classSubjectId?.message}>
+          <FormField label={t.timetable.subjectForClass} htmlFor="classSubjectId" error={errors.classSubjectId?.message}>
             <select id="classSubjectId" className={inputClass} {...register('classSubjectId')}>
-              <option value="">Select…</option>
+              <option value="">…</option>
               {classSubjectsForClass.map((cs) => (
                 <option key={cs.id} value={cs.id}>
                   {cs.subject.name} {cs.teacher ? `(${cs.teacher.user.email})` : '(no teacher)'}
@@ -197,7 +202,7 @@ export default function TimetablePage() {
             </select>
           </FormField>
 
-          <FormField label="Day" htmlFor="dayOfWeek" error={errors.dayOfWeek?.message}>
+          <FormField label={t.timetable.day} htmlFor="dayOfWeek" error={errors.dayOfWeek?.message}>
             <select id="dayOfWeek" className={inputClass} {...register('dayOfWeek')}>
               {DAYS.map((d, i) => (
                 <option key={d} value={i}>
@@ -207,15 +212,15 @@ export default function TimetablePage() {
             </select>
           </FormField>
 
-          <FormField label="Start time" htmlFor="startTime" error={errors.startTime?.message}>
+          <FormField label={t.timetable.startTime} htmlFor="startTime" error={errors.startTime?.message}>
             <input id="startTime" type="time" className={inputClass} {...register('startTime')} />
           </FormField>
 
-          <FormField label="End time" htmlFor="endTime" error={errors.endTime?.message}>
+          <FormField label={t.timetable.endTime} htmlFor="endTime" error={errors.endTime?.message}>
             <input id="endTime" type="time" className={inputClass} {...register('endTime')} />
           </FormField>
 
-          <FormField label="Room (optional)" htmlFor="room">
+          <FormField label={t.timetable.room} htmlFor="room">
             <input id="room" className={inputClass} {...register('room')} />
           </FormField>
 
@@ -226,7 +231,7 @@ export default function TimetablePage() {
             disabled={isSubmitting}
             className="w-full cursor-pointer rounded-md bg-primary px-md py-sm text-sm font-medium text-primary-foreground transition-colors hover:opacity-90 disabled:opacity-60"
           >
-            {isSubmitting ? 'Creating…' : 'Create'}
+            {isSubmitting ? t.common.creating : t.common.create}
           </button>
         </form>
       </Dialog>

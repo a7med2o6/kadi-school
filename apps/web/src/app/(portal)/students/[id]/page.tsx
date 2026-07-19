@@ -6,6 +6,9 @@ import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronRight, FileText, GraduationCap, ReceiptText, TrendingUp } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
+import { useTranslations } from '@/lib/i18n/use-translations';
+import { interpolate } from '@/lib/i18n';
+import { useLocaleStore } from '@/stores/locale-store';
 
 interface Guardian {
   relationship: string;
@@ -24,7 +27,7 @@ interface StudentDetail {
   guardians: Guardian[];
 }
 
-const TABS = ['Overview', 'Grades', 'Attendance', 'Fees', 'Documents'] as const;
+const TABS = ['overview', 'grades', 'attendance', 'fees', 'documents'] as const;
 type Tab = (typeof TABS)[number];
 
 function initials(label: string) {
@@ -38,7 +41,9 @@ function initials(label: string) {
 
 export default function StudentDetailPage() {
   const params = useParams<{ id: string }>();
-  const [tab, setTab] = useState<Tab>('Overview');
+  const [tab, setTab] = useState<Tab>('overview');
+  const t = useTranslations();
+  const locale = useLocaleStore((s) => s.locale);
 
   const { data: student, isLoading } = useQuery({
     queryKey: ['students', params.id],
@@ -46,19 +51,28 @@ export default function StudentDetailPage() {
   });
 
   if (isLoading || !student) {
-    return <p className="text-sm text-muted-foreground">Loading…</p>;
+    return <p className="text-sm text-muted-foreground">{t.common.loading}</p>;
   }
 
   const label = student.user.email ?? student.user.civilId ?? student.admissionNumber;
   const primaryGuardian = student.guardians.find((g) => g.isPrimaryContact) ?? student.guardians[0];
+  const dateLocale = locale === 'ar' ? 'ar-EG' : 'en-US';
+
+  const TAB_LABELS: Record<Tab, string> = {
+    overview: t.studentDetail.tabOverview,
+    grades: t.studentDetail.tabGrades,
+    attendance: t.studentDetail.tabAttendance,
+    fees: t.studentDetail.tabFees,
+    documents: t.studentDetail.tabDocuments,
+  };
 
   return (
     <div className="space-y-lg">
       <nav className="flex items-center gap-1 text-sm text-muted-foreground">
         <Link href="/students" className="hover:text-foreground">
-          Students
+          {t.studentDetail.breadcrumb}
         </Link>
-        <ChevronRight className="h-3.5 w-3.5" />
+        <ChevronRight className="h-3.5 w-3.5 rtl:rotate-180" />
         <span className="font-medium text-foreground">{label}</span>
       </nav>
 
@@ -74,71 +88,73 @@ export default function StudentDetailPage() {
                 student.status === 'ACTIVE' ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'
               }`}
             >
-              {student.status === 'ACTIVE' ? 'Active Student' : student.status}
+              {student.status === 'ACTIVE' ? t.common.active : student.status}
             </span>
           </div>
           <div className="mt-1 flex flex-wrap gap-md text-sm text-muted-foreground">
-            <span>ID: {student.admissionNumber}</span>
-            <span>{student.class?.name ?? 'Unassigned class'}</span>
+            <span>{student.admissionNumber}</span>
+            <span>{student.class?.name ?? t.students.unassigned}</span>
           </div>
         </div>
         <button
           type="button"
           disabled
-          title="Coming soon"
+          title={t.common.comingSoon}
           className="cursor-not-allowed rounded border border-border px-md py-sm text-sm font-medium text-muted-foreground opacity-60"
         >
-          Edit Profile
+          {t.studentDetail.editProfile}
         </button>
       </div>
 
       <div className="flex gap-lg border-b border-border">
-        {TABS.map((t) => (
+        {TABS.map((tb) => (
           <button
-            key={t}
+            key={tb}
             type="button"
-            onClick={() => setTab(t)}
+            onClick={() => setTab(tb)}
             className={`cursor-pointer border-b-2 pb-sm text-sm font-medium transition-colors ${
-              tab === t ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
+              tab === tb ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
-            {t}
+            {TAB_LABELS[tb]}
           </button>
         ))}
       </div>
 
-      {tab === 'Overview' && (
+      {tab === 'overview' && (
         <div className="grid grid-cols-1 gap-lg lg:grid-cols-3">
           <div className="space-y-lg lg:col-span-1">
             <div className="rounded-lg border border-border bg-card p-lg shadow-ambient">
               <h2 className="mb-md text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                Personal Information
+                {t.studentDetail.personalInfo}
               </h2>
               <dl className="space-y-sm text-sm">
                 <div className="flex justify-between">
-                  <dt className="text-muted-foreground">Date of Birth</dt>
+                  <dt className="text-muted-foreground">{t.studentDetail.dob}</dt>
                   <dd className="font-medium text-foreground">
-                    {student.dateOfBirth ? new Date(student.dateOfBirth).toLocaleDateString() : '—'}
+                    {student.dateOfBirth ? new Date(student.dateOfBirth).toLocaleDateString(dateLocale) : '—'}
                   </dd>
                 </div>
                 <div className="flex justify-between">
-                  <dt className="text-muted-foreground">Gender</dt>
+                  <dt className="text-muted-foreground">{t.studentDetail.gender}</dt>
                   <dd className="font-medium capitalize text-foreground">{student.gender ?? '—'}</dd>
                 </div>
                 <div className="flex justify-between">
-                  <dt className="text-muted-foreground">Civil ID</dt>
+                  <dt className="text-muted-foreground">{t.students.civilId}</dt>
                   <dd className="font-medium text-foreground">{student.user.civilId ?? '—'}</dd>
                 </div>
                 <div className="flex justify-between">
-                  <dt className="text-muted-foreground">Enrolled</dt>
-                  <dd className="font-medium text-foreground">{new Date(student.enrollmentDate).toLocaleDateString()}</dd>
+                  <dt className="text-muted-foreground">{t.studentDetail.enrolled}</dt>
+                  <dd className="font-medium text-foreground">
+                    {new Date(student.enrollmentDate).toLocaleDateString(dateLocale)}
+                  </dd>
                 </div>
               </dl>
             </div>
 
             <div className="rounded-lg border border-border bg-card p-lg shadow-ambient">
               <h2 className="mb-md text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                Guardian Information
+                {t.studentDetail.guardianInfo}
               </h2>
               {primaryGuardian ? (
                 <div>
@@ -152,13 +168,13 @@ export default function StudentDetailPage() {
                     </div>
                   </div>
                   {primaryGuardian.parent.user.phone && (
-                    <div className="rounded border border-border px-sm py-1.5 text-sm text-foreground">
+                    <div className="rounded border border-border px-sm py-1.5 text-sm text-foreground" dir="ltr">
                       {primaryGuardian.parent.user.phone}
                     </div>
                   )}
                 </div>
               ) : (
-                <p className="text-sm text-muted-foreground">No guardian linked yet</p>
+                <p className="text-sm text-muted-foreground">{t.students.noGuardian}</p>
               )}
             </div>
           </div>
@@ -167,37 +183,41 @@ export default function StudentDetailPage() {
             <div className="grid grid-cols-2 gap-md">
               <div className="rounded-lg border border-border bg-card p-lg shadow-ambient">
                 <div className="mb-2 flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">GPA Score</span>
+                  <span className="text-sm text-muted-foreground">{t.studentDetail.gpaScore}</span>
                   <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary">
                     <TrendingUp className="h-4 w-4" />
                   </span>
                 </div>
                 <div className="text-2xl font-bold text-muted-foreground">—</div>
-                <p className="text-xs text-muted-foreground">Available once grades are recorded</p>
+                <p className="text-xs text-muted-foreground">{t.studentDetail.gpaPlaceholder}</p>
               </div>
               <div className="rounded-lg border border-border bg-card p-lg shadow-ambient">
                 <div className="mb-2 flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Attendance</span>
+                  <span className="text-sm text-muted-foreground">{t.studentDetail.attendance}</span>
                   <span className="flex h-9 w-9 items-center justify-center rounded-full bg-secondary/10 text-secondary">
                     <GraduationCap className="h-4 w-4" />
                   </span>
                 </div>
                 <div className="text-2xl font-bold text-muted-foreground">—</div>
-                <p className="text-xs text-muted-foreground">Available once attendance is tracked</p>
+                <p className="text-xs text-muted-foreground">{t.studentDetail.attendancePlaceholder}</p>
               </div>
             </div>
 
             <div className="rounded-lg border border-border bg-card p-lg shadow-ambient">
               <h2 className="mb-md text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                Activity Timeline
+                {t.studentDetail.activityTimeline}
               </h2>
               <div className="flex items-start gap-sm text-sm">
                 <span className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-primary" />
                 <div>
                   <p className="text-foreground">
-                    Enrolled{student.class ? ` in ${student.class.name}` : ''}
+                    {student.class
+                      ? interpolate(t.studentDetail.enrolledInClass, { class: student.class.name })
+                      : t.studentDetail.enrolled}
                   </p>
-                  <p className="text-xs text-muted-foreground">{new Date(student.enrollmentDate).toLocaleDateString()}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {new Date(student.enrollmentDate).toLocaleDateString(dateLocale)}
+                  </p>
                 </div>
               </div>
             </div>
@@ -205,10 +225,10 @@ export default function StudentDetailPage() {
         </div>
       )}
 
-      {tab === 'Grades' && <EmptyTab icon={TrendingUp} message="Grades will appear here once exams are recorded (Phase 5)." />}
-      {tab === 'Attendance' && <EmptyTab icon={GraduationCap} message="Attendance history will appear here once tracking starts (Phase 4)." />}
-      {tab === 'Fees' && <EmptyTab icon={ReceiptText} message="Invoices and payments will appear here once Finance is set up (Phase 7)." />}
-      {tab === 'Documents' && <EmptyTab icon={FileText} message="Uploaded documents will appear here once file storage is wired up (Phase 5+)." />}
+      {tab === 'grades' && <EmptyTab icon={TrendingUp} message={t.studentDetail.gradesEmpty} />}
+      {tab === 'attendance' && <EmptyTab icon={GraduationCap} message={t.studentDetail.attendanceEmpty} />}
+      {tab === 'fees' && <EmptyTab icon={ReceiptText} message={t.studentDetail.feesEmpty} />}
+      {tab === 'documents' && <EmptyTab icon={FileText} message={t.studentDetail.documentsEmpty} />}
     </div>
   );
 }

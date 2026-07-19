@@ -11,6 +11,8 @@ import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { Dialog } from '@/components/ui/dialog';
 import { FormField, inputClass } from '@/components/ui/form-field';
 import { hasPermission } from '@/stores/auth-store';
+import { useTranslations } from '@/lib/i18n/use-translations';
+import { interpolate } from '@/lib/i18n';
 
 interface Subject {
   id: string;
@@ -29,6 +31,7 @@ export default function SubjectsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
   const canWrite = hasPermission('subjects:write');
+  const t = useTranslations();
 
   const subjectsQuery = useQuery({ queryKey: ['subjects'], queryFn: () => apiClient.get<Subject[]>('/subjects') });
 
@@ -55,14 +58,17 @@ export default function SubjectsPage() {
   });
 
   const columns: DataTableColumn<Subject>[] = [
-    { key: 'name', label: 'Name', render: (r) => r.name },
-    { key: 'code', label: 'Code', render: (r) => r.code },
+    { key: 'name', label: t.subjects.name, render: (r) => r.name },
+    { key: 'code', label: t.subjects.code, render: (r) => r.code },
   ];
 
   return (
     <div className="space-y-lg">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Subjects</h1>
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">{t.subjects.title}</h1>
+          <p className="text-sm text-muted-foreground">{t.subjects.subtitle}</p>
+        </div>
         {canWrite && (
           <button
             type="button"
@@ -73,7 +79,7 @@ export default function SubjectsPage() {
             className="inline-flex cursor-pointer items-center gap-1 rounded-md bg-primary px-md py-sm text-sm font-medium text-primary-foreground transition-colors hover:opacity-90"
           >
             <Plus className="h-4 w-4" />
-            New Subject
+            {t.subjects.newSubject}
           </button>
         )}
       </div>
@@ -84,13 +90,15 @@ export default function SubjectsPage() {
         isLoading={subjectsQuery.isLoading}
         error={subjectsQuery.error ? (subjectsQuery.error as Error).message : null}
         getSearchText={(r) => `${r.name} ${r.code}`}
-        searchPlaceholder="Search subjects…"
+        searchPlaceholder={t.subjects.searchPlaceholder}
         rowActions={
           canWrite
             ? (r) => (
                 <button
                   type="button"
-                  onClick={() => confirm(`Delete subject "${r.name}"?`) && deleteSubject.mutate(r.id)}
+                  onClick={() =>
+                    confirm(interpolate(t.subjects.deleteConfirm, { name: r.name })) && deleteSubject.mutate(r.id)
+                  }
                   className="cursor-pointer rounded-md p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                   aria-label={`Delete ${r.name}`}
                 >
@@ -101,18 +109,18 @@ export default function SubjectsPage() {
         }
       />
 
-      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} title="New Subject">
+      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} title={t.subjects.newSubject}>
         <form
           onSubmit={handleSubmit((data) => {
             setServerError(null);
             createSubject.mutate(data);
           })}
         >
-          <FormField label="Name" htmlFor="name" error={errors.name?.message}>
+          <FormField label={t.subjects.name} htmlFor="name" error={errors.name?.message}>
             <input id="name" className={inputClass} placeholder="Mathematics" {...register('name')} />
           </FormField>
 
-          <FormField label="Code" htmlFor="code" error={errors.code?.message}>
+          <FormField label={t.subjects.code} htmlFor="code" error={errors.code?.message}>
             <input id="code" className={inputClass} placeholder="MATH5" {...register('code')} />
           </FormField>
 
@@ -123,7 +131,7 @@ export default function SubjectsPage() {
             disabled={isSubmitting}
             className="w-full cursor-pointer rounded-md bg-primary px-md py-sm text-sm font-medium text-primary-foreground transition-colors hover:opacity-90 disabled:opacity-60"
           >
-            {isSubmitting ? 'Creating…' : 'Create'}
+            {isSubmitting ? t.common.creating : t.common.create}
           </button>
         </form>
       </Dialog>

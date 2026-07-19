@@ -15,22 +15,23 @@ import {
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { useAuthStore } from '@/stores/auth-store';
+import { useTranslations } from '@/lib/i18n/use-translations';
 
 interface NavItem {
   href: string;
-  label: string;
+  labelKey: keyof ReturnType<typeof useTranslations>['nav'];
   icon: typeof LayoutDashboard;
   permission?: string;
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/classes', label: 'Classes', icon: School, permission: 'classes:read' },
-  { href: '/subjects', label: 'Subjects', icon: BookOpen, permission: 'subjects:read' },
-  { href: '/timetable', label: 'Timetable', icon: CalendarDays, permission: 'timetable:read' },
-  { href: '/teachers', label: 'Teachers', icon: GraduationCap, permission: 'teachers:read' },
-  { href: '/students', label: 'Students', icon: UsersRound, permission: 'students:read' },
-  { href: '/users', label: 'Users', icon: Users, permission: 'users:read' },
+  { href: '/dashboard', labelKey: 'dashboard', icon: LayoutDashboard },
+  { href: '/classes', labelKey: 'classes', icon: School, permission: 'classes:read' },
+  { href: '/subjects', labelKey: 'subjects', icon: BookOpen, permission: 'subjects:read' },
+  { href: '/timetable', labelKey: 'timetable', icon: CalendarDays, permission: 'timetable:read' },
+  { href: '/teachers', labelKey: 'teachers', icon: GraduationCap, permission: 'teachers:read' },
+  { href: '/students', labelKey: 'students', icon: UsersRound, permission: 'students:read' },
+  { href: '/users', labelKey: 'users', icon: Users, permission: 'users:read' },
 ];
 
 function initials(label: string) {
@@ -48,6 +49,7 @@ export function Sidebar() {
   const user = useAuthStore((s) => s.user);
   const clear = useAuthStore((s) => s.clear);
   const permissions = user?.permissions ?? [];
+  const t = useTranslations();
 
   const items = NAV_ITEMS.filter((item) => !item.permission || permissions.includes(item.permission));
   const identity = user?.email ?? user?.civilId ?? '';
@@ -67,7 +69,7 @@ export function Sidebar() {
         </span>
         <div>
           <div className="text-base font-bold leading-tight text-foreground">Kadi School</div>
-          <div className="text-xs font-medium tracking-wide text-muted-foreground">ADMIN PORTAL</div>
+          <div className="text-xs font-medium tracking-wide text-muted-foreground">{t.nav.adminPortal}</div>
         </div>
       </div>
 
@@ -86,7 +88,7 @@ export function Sidebar() {
               }`}
             >
               <Icon className="h-4 w-4" />
-              {item.label}
+              {t.nav[item.labelKey]}
             </Link>
           );
         })}
@@ -102,7 +104,7 @@ export function Sidebar() {
           }`}
         >
           <Settings className="h-4 w-4" />
-          Settings
+          {t.nav.settings}
         </Link>
       </nav>
 
@@ -117,7 +119,7 @@ export function Sidebar() {
         <button
           type="button"
           onClick={handleLogout}
-          aria-label="Logout"
+          aria-label={t.common.logout}
           className="cursor-pointer rounded p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-destructive"
         >
           <LogOut className="h-4 w-4" />
