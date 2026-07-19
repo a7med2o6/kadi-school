@@ -22,6 +22,7 @@ out/
 
 # nest
 dist/
+apps/api/uploads/
 
 # production
 build

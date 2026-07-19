@@ -45,4 +45,16 @@ export class UpdateStudentDto {
   @IsOptional()
   @IsIn(STATUSES)
   status?: (typeof STATUSES)[number];
+
+  @IsOptional()
+  @IsDateString()
+  dateOfBirth?: string;
+
+  @IsOptional()
+  @IsIn(GENDERS)
+  gender?: (typeof GENDERS)[number];
+
+  @IsOptional()
+  @IsString()
+  nationality?: string;
 }

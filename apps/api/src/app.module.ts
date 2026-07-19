@@ -6,7 +6,10 @@ import { AcademicsModule } from './academics/academics.module';
 import { AssignmentsModule } from './assignments/assignments.module';
 import { AttendanceModule } from './attendance/attendance.module';
 import { CoreModule } from './core/core.module';
+import { DocumentsModule } from './documents/documents.module';
 import { ExamsModule } from './exams/exams.module';
+import { FeesModule } from './fees/fees.module';
+import { FilesModule } from './files/files.module';
 import { GradesModule } from './grades/grades.module';
 import { IamModule } from './iam/iam.module';
 import { NotificationsModule } from './notifications/notifications.module';
@@ -40,6 +43,9 @@ import { TimetableModule } from './timetable/timetable.module';
     AssignmentsModule,
     ExamsModule,
     NotificationsModule,
+    FilesModule,
+    FeesModule,
+    DocumentsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

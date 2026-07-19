@@ -24,6 +24,10 @@ function getApiBaseUrl(): string {
   return `${protocol}//${subdomain}.${apiHostname}${apiPort ? `:${apiPort}` : ''}/api/v1`;
 }
 
+export function getApiOrigin(): string {
+  return getApiBaseUrl().replace(/\/api\/v1$/, '');
+}
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -35,12 +39,15 @@ export class ApiError extends Error {
 
 async function request<T>(path: string, init: RequestInit = {}, isRetry = false): Promise<T> {
   const accessToken = useAuthStore.getState().accessToken;
+  // FormData bodies must let the browser set their own multipart boundary — a fixed
+  // Content-Type here would break upload parsing on the server.
+  const isFormData = init.body instanceof FormData;
 
   const res = await fetch(`${getApiBaseUrl()}${path}`, {
     ...init,
     credentials: 'include',
     headers: {
-      'Content-Type': 'application/json',
+      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
       ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       ...init.headers,
     },
@@ -87,4 +94,24 @@ export const apiClient = {
   patch: <T>(path: string, body?: unknown) =>
     request<T>(path, { method: 'PATCH', body: body ? JSON.stringify(body) : undefined }),
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
+  upload: <T>(path: string, formData: FormData) => request<T>(path, { method: 'POST', body: formData }),
 };
+
+/** Triggers a browser download for an authenticated file endpoint (plain <a href> can't attach a Bearer token). */
+export async function downloadAuthenticated(path: string, fallbackFilename: string): Promise<void> {
+  const accessToken = useAuthStore.getState().accessToken;
+  const res = await fetch(`${getApiBaseUrl()}${path}`, {
+    credentials: 'include',
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+  });
+  if (!res.ok) throw new ApiError(res.status, 'Download failed');
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fallbackFilename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}

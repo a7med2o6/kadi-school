@@ -50,9 +50,21 @@ export class StudentsService {
     await this.get(id);
     return this.prisma.client.student.update({
       where: { id },
-      data: { classId: dto.classId, status: dto.status },
+      data: {
+        classId: dto.classId,
+        status: dto.status,
+        dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : undefined,
+        gender: dto.gender,
+        nationality: dto.nationality,
+      },
       include: INCLUDE,
     });
+  }
+
+  async updateAvatar(id: string, avatarUrl: string) {
+    const student = await this.get(id);
+    await this.prisma.client.user.update({ where: { id: student.userId }, data: { avatarUrl } });
+    return this.get(id);
   }
 
   async remove(id: string) {

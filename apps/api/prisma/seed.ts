@@ -38,6 +38,8 @@ const PERMISSIONS = [
   { key: 'notifications:write', module: 'notifications', description: 'Send notifications/announcements' },
   { key: 'finance:read', module: 'finance', description: 'View invoices/payments' },
   { key: 'finance:write', module: 'finance', description: 'Manage invoices/payments' },
+  { key: 'documents:read', module: 'documents', description: 'View student documents' },
+  { key: 'documents:write', module: 'documents', description: 'Upload/manage student documents' },
   { key: 'payroll:read', module: 'payroll', description: 'View payroll' },
   { key: 'payroll:write', module: 'payroll', description: 'Manage payroll' },
 ] as const;
@@ -76,6 +78,7 @@ const DEFAULT_ROLES: { name: string; permissions: readonly string[] }[] = [
       'attendance:read',
       'notifications:read',
       'finance:read',
+      'documents:read',
     ],
   },
   { name: 'HR', permissions: ['users:read', 'teachers:read', 'teachers:write', 'payroll:write'] },

@@ -4,6 +4,7 @@ export const SAFE_USER_FIELDS = {
   email: true,
   civilId: true,
   phone: true,
+  avatarUrl: true,
   status: true,
   locale: true,
   lastLoginAt: true,

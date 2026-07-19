@@ -1,10 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  Camera,
   CalendarCheck,
   ChevronRight,
   ClipboardCheck,
@@ -12,11 +16,15 @@ import {
   FileText,
   GraduationCap,
   MessageSquare,
+  Plus,
   Printer,
   ReceiptText,
+  Trash2,
   TrendingUp,
 } from 'lucide-react';
-import { apiClient, ApiError } from '@/lib/api-client';
+import { apiClient, ApiError, downloadAuthenticated, getApiOrigin } from '@/lib/api-client';
+import { Dialog } from '@/components/ui/dialog';
+import { FormField, inputClass } from '@/components/ui/form-field';
 import { useTranslations } from '@/lib/i18n/use-translations';
 import { interpolate } from '@/lib/i18n';
 import { useLocaleStore } from '@/stores/locale-store';
@@ -36,9 +44,52 @@ interface StudentDetail {
   nationality: string | null;
   enrollmentDate: string;
   class: { id: string; name: string } | null;
-  user: { email: string | null; civilId: string | null; phone: string | null };
+  user: { email: string | null; civilId: string | null; phone: string | null; avatarUrl: string | null };
   guardians: Guardian[];
 }
+interface SchoolClass {
+  id: string;
+  name: string;
+}
+
+type FeeStatus = 'PENDING' | 'PAID' | 'OVERDUE';
+interface FeeInvoice {
+  id: string;
+  title: string;
+  amount: string;
+  dueDate: string;
+  status: FeeStatus;
+  paidAt: string | null;
+}
+interface StudentDocumentRow {
+  id: string;
+  title: string;
+  fileName: string;
+  mimeType: string;
+  fileSize: number;
+  createdAt: string;
+  uploadedByUser: { email: string | null } | null;
+}
+
+const editProfileSchema = z.object({
+  dateOfBirth: z.string().optional(),
+  gender: z.union([z.enum(['male', 'female']), z.literal('')]).optional(),
+  nationality: z.string().optional(),
+  classId: z.string().optional(),
+});
+type EditProfileInput = z.infer<typeof editProfileSchema>;
+
+const feeInvoiceSchema = z.object({
+  title: z.string().min(1, 'Required'),
+  amount: z.coerce.number().positive('Must be positive'),
+  dueDate: z.string().min(1, 'Required'),
+});
+type FeeInvoiceInput = z.infer<typeof feeInvoiceSchema>;
+
+const documentSchema = z.object({
+  title: z.string().min(1, 'Required'),
+});
+type DocumentInput = z.infer<typeof documentSchema>;
 
 type GradeComponent = 'QUIZZES' | 'MIDTERM' | 'FINAL' | 'PARTICIPATION';
 const GRADE_COMPONENTS: GradeComponent[] = ['QUIZZES', 'MIDTERM', 'FINAL', 'PARTICIPATION'];
@@ -121,14 +172,40 @@ export default function StudentDetailPage() {
   const [tab, setTab] = useState<Tab>('overview');
   const [reportMonth, setReportMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const [noteBody, setNoteBody] = useState('');
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [feeDialogOpen, setFeeDialogOpen] = useState(false);
+  const [docDialogOpen, setDocDialogOpen] = useState(false);
+  const [docFile, setDocFile] = useState<File | null>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
   const t = useTranslations();
   const locale = useLocaleStore((s) => s.locale);
   const queryClient = useQueryClient();
   const canWrite = hasPermission('attendance:write');
+  const canEditProfile = hasPermission('students:write');
+  const canViewFees = hasPermission('finance:read');
+  const canManageFees = hasPermission('finance:write');
+  const canViewDocuments = hasPermission('documents:read');
+  const canManageDocuments = hasPermission('documents:write');
 
   const { data: student, isLoading } = useQuery({
     queryKey: ['students', params.id],
     queryFn: () => apiClient.get<StudentDetail>(`/students/${params.id}`),
+  });
+
+  const classesQuery = useQuery({
+    queryKey: ['classes'],
+    queryFn: () => apiClient.get<SchoolClass[]>('/classes'),
+    enabled: canEditProfile,
+  });
+  const feesQuery = useQuery({
+    queryKey: ['fees', params.id],
+    queryFn: () => apiClient.get<FeeInvoice[]>(`/fees?studentId=${params.id}`),
+    enabled: !!params.id && canViewFees,
+  });
+  const documentsQuery = useQuery({
+    queryKey: ['documents', params.id],
+    queryFn: () => apiClient.get<StudentDocumentRow[]>(`/documents?studentId=${params.id}`),
+    enabled: !!params.id && canViewDocuments,
   });
 
   const { start, end } = monthRange(reportMonth);
@@ -167,6 +244,83 @@ export default function StudentDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['attendance-notes', params.id] });
       setNoteBody('');
     },
+  });
+
+  const {
+    register: registerEdit,
+    handleSubmit: handleEditSubmit,
+    reset: resetEditForm,
+    formState: { errors: editErrors },
+  } = useForm<EditProfileInput>({ resolver: zodResolver(editProfileSchema) });
+
+  const {
+    register: registerFee,
+    handleSubmit: handleFeeSubmit,
+    reset: resetFeeForm,
+    formState: { errors: feeErrors },
+  } = useForm<FeeInvoiceInput>({ resolver: zodResolver(feeInvoiceSchema) });
+
+  const {
+    register: registerDoc,
+    handleSubmit: handleDocSubmit,
+    reset: resetDocForm,
+    formState: { errors: docErrors },
+  } = useForm<DocumentInput>({ resolver: zodResolver(documentSchema) });
+
+  const updateProfileMutation = useMutation({
+    mutationFn: (data: EditProfileInput) =>
+      apiClient.patch(`/students/${params.id}`, {
+        dateOfBirth: data.dateOfBirth || undefined,
+        gender: data.gender || undefined,
+        nationality: data.nationality || undefined,
+        classId: data.classId || undefined,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['students', params.id] });
+      setEditDialogOpen(false);
+    },
+  });
+
+  const avatarMutation = useMutation({
+    mutationFn: (file: File) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      return apiClient.upload(`/students/${params.id}/avatar`, formData);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['students', params.id] }),
+  });
+
+  const createInvoiceMutation = useMutation({
+    mutationFn: (data: FeeInvoiceInput) => apiClient.post('/fees', { studentId: params.id, ...data }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['fees', params.id] });
+      setFeeDialogOpen(false);
+    },
+  });
+
+  const markPaidMutation = useMutation({
+    mutationFn: (id: string) => apiClient.patch(`/fees/${id}/pay`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['fees', params.id] }),
+  });
+
+  const uploadDocMutation = useMutation({
+    mutationFn: ({ title, file }: { title: string; file: File }) => {
+      const formData = new FormData();
+      formData.append('studentId', params.id);
+      formData.append('title', title);
+      formData.append('file', file);
+      return apiClient.upload('/documents', formData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['documents', params.id] });
+      setDocDialogOpen(false);
+      setDocFile(null);
+    },
+  });
+
+  const deleteDocMutation = useMutation({
+    mutationFn: (id: string) => apiClient.delete(`/documents/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['documents', params.id] }),
   });
 
   const records = attendanceQuery.data ?? [];
@@ -277,6 +431,21 @@ export default function StudentDetailPage() {
     documents: t.studentDetail.tabDocuments,
   };
 
+  const apiOrigin = getApiOrigin();
+  const feeInvoices = feesQuery.data ?? [];
+  const totalDue = feeInvoices.filter((f) => f.status !== 'PAID').reduce((sum, f) => sum + parseFloat(f.amount), 0);
+  const totalPaid = feeInvoices.filter((f) => f.status === 'PAID').reduce((sum, f) => sum + parseFloat(f.amount), 0);
+  const FEE_STATUS_BADGE: Record<FeeStatus, string> = {
+    PENDING: 'bg-tertiary/10 text-tertiary',
+    PAID: 'bg-success/10 text-success',
+    OVERDUE: 'bg-destructive/10 text-destructive',
+  };
+  const FEE_STATUS_LABEL: Record<FeeStatus, string> = {
+    PENDING: t.studentDetail.feesStatusPending,
+    PAID: t.studentDetail.feesStatusPaid,
+    OVERDUE: t.studentDetail.feesStatusOverdue,
+  };
+
   return (
     <div className="space-y-lg">
       <nav className="flex items-center gap-1 text-sm text-muted-foreground">
@@ -288,9 +457,44 @@ export default function StudentDetailPage() {
       </nav>
 
       <div className="flex flex-wrap items-center gap-md rounded-lg border border-border bg-card p-lg shadow-ambient">
-        <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-lg font-bold text-primary">
-          {initials(label)}
-        </span>
+        <div className="relative h-16 w-16 shrink-0">
+          {student.user.avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- external upload, not part of the Next.js image pipeline
+            <img
+              src={`${apiOrigin}${student.user.avatarUrl}`}
+              alt={label}
+              className="h-16 w-16 rounded-lg object-cover"
+            />
+          ) : (
+            <span className="flex h-16 w-16 items-center justify-center rounded-lg bg-primary/10 text-lg font-bold text-primary">
+              {initials(label)}
+            </span>
+          )}
+          {canEditProfile && (
+            <>
+              <button
+                type="button"
+                onClick={() => avatarInputRef.current?.click()}
+                disabled={avatarMutation.isPending}
+                title={t.studentDetail.changePhoto}
+                className="absolute -bottom-1 -end-1 flex h-6 w-6 cursor-pointer items-center justify-center rounded-full border-2 border-card bg-primary text-primary-foreground shadow-ambient transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Camera className="h-3 w-3" />
+              </button>
+              <input
+                ref={avatarInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) avatarMutation.mutate(file);
+                  e.target.value = '';
+                }}
+              />
+            </>
+          )}
+        </div>
         <div className="flex-1">
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold text-foreground">{label}</h1>
@@ -307,14 +511,32 @@ export default function StudentDetailPage() {
             <span>{student.class?.name ?? t.students.unassigned}</span>
           </div>
         </div>
-        <button
-          type="button"
-          disabled
-          title={t.common.comingSoon}
-          className="cursor-not-allowed rounded border border-border px-md py-sm text-sm font-medium text-muted-foreground opacity-60"
-        >
-          {t.studentDetail.editProfile}
-        </button>
+        {canEditProfile ? (
+          <button
+            type="button"
+            onClick={() => {
+              resetEditForm({
+                dateOfBirth: student.dateOfBirth ? student.dateOfBirth.slice(0, 10) : '',
+                gender: (student.gender as 'male' | 'female' | '') ?? '',
+                nationality: student.nationality ?? '',
+                classId: student.class?.id ?? '',
+              });
+              setEditDialogOpen(true);
+            }}
+            className="cursor-pointer rounded border border-border px-md py-sm text-sm font-medium text-foreground transition-colors hover:bg-accent"
+          >
+            {t.studentDetail.editProfile}
+          </button>
+        ) : (
+          <button
+            type="button"
+            disabled
+            title={t.common.comingSoon}
+            className="cursor-not-allowed rounded border border-border px-md py-sm text-sm font-medium text-muted-foreground opacity-60"
+          >
+            {t.studentDetail.editProfile}
+          </button>
+        )}
       </div>
 
       <div className="flex gap-lg border-b border-border">
@@ -348,7 +570,13 @@ export default function StudentDetailPage() {
                 </div>
                 <div className="flex justify-between">
                   <dt className="text-muted-foreground">{t.studentDetail.gender}</dt>
-                  <dd className="font-medium capitalize text-foreground">{student.gender ?? '—'}</dd>
+                  <dd className="font-medium text-foreground">
+                    {student.gender === 'male'
+                      ? t.studentDetail.genderMale
+                      : student.gender === 'female'
+                        ? t.studentDetail.genderFemale
+                        : '—'}
+                  </dd>
                 </div>
                 <div className="flex justify-between">
                   <dt className="text-muted-foreground">{t.students.nationality}</dt>
@@ -781,8 +1009,288 @@ export default function StudentDetailPage() {
         </div>
       )}
 
-      {tab === 'fees' && <EmptyTab icon={ReceiptText} message={t.studentDetail.feesEmpty} />}
-      {tab === 'documents' && <EmptyTab icon={FileText} message={t.studentDetail.documentsEmpty} />}
+      {tab === 'fees' && (
+        <div className="space-y-lg">
+          {!canViewFees ? (
+            <EmptyTab icon={ReceiptText} message={t.studentDetail.feesEmpty} />
+          ) : (
+            <>
+              <div className="flex flex-wrap items-center justify-between gap-md">
+                <div className="grid grid-cols-2 gap-md">
+                  <div className="rounded-lg border border-border bg-card p-lg shadow-ambient">
+                    <div className="text-xs text-muted-foreground">{t.studentDetail.feesTotalDue}</div>
+                    <div className="text-2xl font-bold text-foreground" dir="ltr">
+                      {totalDue.toFixed(2)}
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-border bg-card p-lg shadow-ambient">
+                    <div className="text-xs text-muted-foreground">{t.studentDetail.feesTotalPaid}</div>
+                    <div className="text-2xl font-bold text-success" dir="ltr">
+                      {totalPaid.toFixed(2)}
+                    </div>
+                  </div>
+                </div>
+                {canManageFees && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      resetFeeForm({ title: '', amount: undefined, dueDate: '' });
+                      setFeeDialogOpen(true);
+                    }}
+                    className="inline-flex cursor-pointer items-center gap-1 rounded bg-primary px-md py-sm text-sm font-medium text-primary-foreground transition-colors hover:opacity-90"
+                  >
+                    <Plus className="h-4 w-4" />
+                    {t.studentDetail.feesAddInvoice}
+                  </button>
+                )}
+              </div>
+
+              {feeInvoices.length === 0 ? (
+                <EmptyTab icon={ReceiptText} message={t.studentDetail.feesEmpty} />
+              ) : (
+                <div className="rounded-lg border border-border bg-card p-lg shadow-ambient">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-start text-sm">
+                      <thead className="border-b border-border text-muted-foreground">
+                        <tr>
+                          <th className="whitespace-nowrap px-md py-sm text-start font-medium">
+                            {t.studentDetail.feesInvoiceTitleLabel}
+                          </th>
+                          <th className="whitespace-nowrap px-md py-sm text-start font-medium">
+                            {t.studentDetail.feesAmountLabel}
+                          </th>
+                          <th className="whitespace-nowrap px-md py-sm text-start font-medium">
+                            {t.studentDetail.feesDueDateLabel}
+                          </th>
+                          <th className="whitespace-nowrap px-md py-sm text-start font-medium">
+                            {t.attendanceRegister.status}
+                          </th>
+                          <th className="whitespace-nowrap px-md py-sm text-start font-medium">{t.common.actions}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {feeInvoices.map((f) => (
+                          <tr key={f.id} className="border-b border-border last:border-0">
+                            <td className="whitespace-nowrap px-md py-sm font-medium text-foreground">{f.title}</td>
+                            <td className="whitespace-nowrap px-md py-sm text-foreground" dir="ltr">
+                              {parseFloat(f.amount).toFixed(2)}
+                            </td>
+                            <td className="whitespace-nowrap px-md py-sm text-foreground" dir="ltr">
+                              {new Date(f.dueDate).toLocaleDateString(dateLocale)}
+                            </td>
+                            <td className="whitespace-nowrap px-md py-sm">
+                              <span className={`rounded-full px-sm py-0.5 text-xs font-medium ${FEE_STATUS_BADGE[f.status]}`}>
+                                {FEE_STATUS_LABEL[f.status]}
+                              </span>
+                            </td>
+                            <td className="whitespace-nowrap px-md py-sm">
+                              {canManageFees && f.status !== 'PAID' && (
+                                <button
+                                  type="button"
+                                  onClick={() => markPaidMutation.mutate(f.id)}
+                                  disabled={markPaidMutation.isPending}
+                                  className="cursor-pointer rounded border border-border px-sm py-1 text-xs font-medium text-foreground transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                  {t.studentDetail.feesMarkPaid}
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {tab === 'documents' && (
+        <div className="space-y-lg">
+          {!canViewDocuments ? (
+            <EmptyTab icon={FileText} message={t.studentDetail.documentsEmpty} />
+          ) : (
+            <>
+              {canManageDocuments && (
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDocFile(null);
+                      resetDocForm({ title: '' });
+                      setDocDialogOpen(true);
+                    }}
+                    className="inline-flex cursor-pointer items-center gap-1 rounded bg-primary px-md py-sm text-sm font-medium text-primary-foreground transition-colors hover:opacity-90"
+                  >
+                    <Plus className="h-4 w-4" />
+                    {t.studentDetail.documentsUploadTitle}
+                  </button>
+                </div>
+              )}
+
+              {!documentsQuery.data || documentsQuery.data.length === 0 ? (
+                <EmptyTab icon={FileText} message={t.studentDetail.documentsEmpty} />
+              ) : (
+                <div className="rounded-lg border border-border bg-card p-lg shadow-ambient">
+                  <ul className="divide-y divide-border">
+                    {documentsQuery.data.map((d) => (
+                      <li key={d.id} className="flex items-center justify-between gap-md py-sm first:pt-0 last:pb-0">
+                        <div className="flex items-center gap-sm">
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                            <FileText className="h-4 w-4" />
+                          </span>
+                          <div>
+                            <div className="text-sm font-medium text-foreground">{d.title}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {interpolate(t.studentDetail.documentsUploadedBy, { name: d.uploadedByUser?.email ?? '—' })} ·{' '}
+                              {new Date(d.createdAt).toLocaleDateString(dateLocale)}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => downloadAuthenticated(`/documents/${d.id}/download`, d.fileName)}
+                            className="cursor-pointer rounded p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                            aria-label={t.common.download}
+                          >
+                            <Download className="h-4 w-4" />
+                          </button>
+                          {canManageDocuments && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                confirm(interpolate(t.studentDetail.documentsDeleteConfirm, { title: d.title })) &&
+                                deleteDocMutation.mutate(d.id)
+                              }
+                              className="cursor-pointer rounded p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                              aria-label={t.common.delete}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      <Dialog
+        open={editDialogOpen}
+        onClose={() => setEditDialogOpen(false)}
+        title={t.studentDetail.editProfileTitle}
+      >
+        <form
+          onSubmit={handleEditSubmit((data) => {
+            updateProfileMutation.mutate(data);
+          })}
+        >
+          <FormField label={t.studentDetail.dob} htmlFor="editDob" error={editErrors.dateOfBirth?.message}>
+            <input id="editDob" type="date" className={inputClass} dir="ltr" {...registerEdit('dateOfBirth')} />
+          </FormField>
+          <FormField label={t.studentDetail.gender} htmlFor="editGender">
+            <select id="editGender" className={inputClass} {...registerEdit('gender')}>
+              <option value="">{t.studentDetail.selectGender}</option>
+              <option value="male">{t.studentDetail.genderMale}</option>
+              <option value="female">{t.studentDetail.genderFemale}</option>
+            </select>
+          </FormField>
+          <FormField label={t.students.nationality} htmlFor="editNationality">
+            <input id="editNationality" className={inputClass} {...registerEdit('nationality')} />
+          </FormField>
+          <FormField label={t.students.class} htmlFor="editClassId">
+            <select id="editClassId" className={inputClass} {...registerEdit('classId')}>
+              <option value="">{t.students.unassigned}</option>
+              {classesQuery.data?.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </FormField>
+          {updateProfileMutation.isError && (
+            <p className="mb-md text-sm text-destructive">
+              {updateProfileMutation.error instanceof ApiError ? updateProfileMutation.error.message : 'Something went wrong'}
+            </p>
+          )}
+          <button
+            type="submit"
+            disabled={updateProfileMutation.isPending}
+            className="w-full cursor-pointer rounded bg-primary px-md py-sm text-sm font-medium text-primary-foreground transition-colors hover:opacity-90 disabled:opacity-60"
+          >
+            {updateProfileMutation.isPending ? t.common.creating : t.common.save}
+          </button>
+        </form>
+      </Dialog>
+
+      <Dialog open={feeDialogOpen} onClose={() => setFeeDialogOpen(false)} title={t.studentDetail.feesAddInvoice}>
+        <form
+          onSubmit={handleFeeSubmit((data) => {
+            createInvoiceMutation.mutate(data);
+          })}
+        >
+          <FormField label={t.studentDetail.feesInvoiceTitleLabel} htmlFor="feeTitle" error={feeErrors.title?.message}>
+            <input id="feeTitle" className={inputClass} {...registerFee('title')} />
+          </FormField>
+          <FormField label={t.studentDetail.feesAmountLabel} htmlFor="feeAmount" error={feeErrors.amount?.message}>
+            <input id="feeAmount" type="number" step="0.01" className={inputClass} dir="ltr" {...registerFee('amount')} />
+          </FormField>
+          <FormField label={t.studentDetail.feesDueDateLabel} htmlFor="feeDueDate" error={feeErrors.dueDate?.message}>
+            <input id="feeDueDate" type="date" className={inputClass} dir="ltr" {...registerFee('dueDate')} />
+          </FormField>
+          {createInvoiceMutation.isError && (
+            <p className="mb-md text-sm text-destructive">
+              {createInvoiceMutation.error instanceof ApiError ? createInvoiceMutation.error.message : 'Something went wrong'}
+            </p>
+          )}
+          <button
+            type="submit"
+            disabled={createInvoiceMutation.isPending}
+            className="w-full cursor-pointer rounded bg-primary px-md py-sm text-sm font-medium text-primary-foreground transition-colors hover:opacity-90 disabled:opacity-60"
+          >
+            {createInvoiceMutation.isPending ? t.common.creating : t.common.create}
+          </button>
+        </form>
+      </Dialog>
+
+      <Dialog open={docDialogOpen} onClose={() => setDocDialogOpen(false)} title={t.studentDetail.documentsUploadTitle}>
+        <form
+          onSubmit={handleDocSubmit((data) => {
+            if (docFile) uploadDocMutation.mutate({ title: data.title, file: docFile });
+          })}
+        >
+          <FormField label={t.studentDetail.documentsTitleLabel} htmlFor="docTitle" error={docErrors.title?.message}>
+            <input id="docTitle" className={inputClass} {...registerDoc('title')} />
+          </FormField>
+          <FormField label={t.studentDetail.documentsFileLabel} htmlFor="docFile">
+            <input
+              id="docFile"
+              type="file"
+              className={inputClass}
+              onChange={(e) => setDocFile(e.target.files?.[0] ?? null)}
+            />
+          </FormField>
+          {uploadDocMutation.isError && (
+            <p className="mb-md text-sm text-destructive">
+              {uploadDocMutation.error instanceof ApiError ? uploadDocMutation.error.message : 'Something went wrong'}
+            </p>
+          )}
+          <button
+            type="submit"
+            disabled={uploadDocMutation.isPending || !docFile}
+            className="w-full cursor-pointer rounded bg-primary px-md py-sm text-sm font-medium text-primary-foreground transition-colors hover:opacity-90 disabled:opacity-60"
+          >
+            {uploadDocMutation.isPending ? t.common.uploading : t.common.upload}
+          </button>
+        </form>
+      </Dialog>
     </div>
   );
 }

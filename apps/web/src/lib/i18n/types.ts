@@ -15,6 +15,10 @@ export interface Dictionary {
     creating: string;
     delete: string;
     edit: string;
+    add: string;
+    upload: string;
+    uploading: string;
+    download: string;
     actions: string;
     active: string;
     inactive: string;
@@ -136,6 +140,26 @@ export interface Dictionary {
     activitySubmissionLabel: string;
     activityNoteLabel: string;
     noActivityYet: string;
+    editProfileTitle: string;
+    genderMale: string;
+    genderFemale: string;
+    selectGender: string;
+    changePhoto: string;
+    feesTotalDue: string;
+    feesTotalPaid: string;
+    feesAddInvoice: string;
+    feesInvoiceTitleLabel: string;
+    feesAmountLabel: string;
+    feesDueDateLabel: string;
+    feesMarkPaid: string;
+    feesStatusPending: string;
+    feesStatusPaid: string;
+    feesStatusOverdue: string;
+    documentsUploadTitle: string;
+    documentsTitleLabel: string;
+    documentsFileLabel: string;
+    documentsUploadedBy: string;
+    documentsDeleteConfirm: string;
   };
   teachers: {
     title: string;

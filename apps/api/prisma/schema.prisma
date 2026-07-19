@@ -58,6 +58,8 @@ model School {
   examQuestions          ExamQuestion[]
   notifications          Notification[]
   notificationRecipients NotificationRecipient[]
+  feeInvoices            FeeInvoice[]
+  studentDocuments       StudentDocument[]
 
   @@map("schools")
 }
@@ -71,6 +73,7 @@ model User {
   civilId      String?    @map("civil_id")
   passwordHash String     @map("password_hash")
   phone        String?
+  avatarUrl    String?    @map("avatar_url")
   status       UserStatus @default(ACTIVE)
   locale       String     @default("en")
   lastLoginAt  DateTime?  @map("last_login_at")
@@ -86,6 +89,7 @@ model User {
   notificationsCreated    Notification[]           @relation("NotificationCreatedBy")
   notificationsTargeted   Notification[]           @relation("NotificationTargetUser")
   notificationRecipient   NotificationRecipient[]
+  documentsUploaded       StudentDocument[]
 
   @@unique([schoolId, email])
   @@unique([schoolId, civilId])
@@ -338,6 +342,8 @@ model Student {
   attendanceNotes   StudentAttendanceNote[]
   grades            StudentGrade[]
   submissions       AssignmentSubmission[]
+  feeInvoices       FeeInvoice[]
+  documents         StudentDocument[]
 
   @@unique([schoolId, admissionNumber])
   @@index([schoolId])
@@ -675,4 +681,52 @@ model NotificationRecipient {
   @@index([schoolId])
   @@index([userId, readAt])
   @@map("notification_recipients")
+}
+
+enum FeeInvoiceStatus {
+  PENDING
+  PAID
+  OVERDUE
+
+  @@map("fee_invoice_status")
+}
+
+/// Tenant-scoped.
+model FeeInvoice {
+  id        String           @id @default(uuid())
+  schoolId  String           @map("school_id")
+  school    School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  studentId String           @map("student_id")
+  student   Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  title     String
+  amount    Decimal          @db.Decimal(10, 2)
+  dueDate   DateTime         @map("due_date")
+  status    FeeInvoiceStatus @default(PENDING)
+  paidAt    DateTime?        @map("paid_at")
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  @@index([schoolId])
+  @@index([studentId])
+  @@map("fee_invoices")
+}
+
+/// Tenant-scoped. `filePath` is a server-local path under the uploads root — never exposed directly.
+model StudentDocument {
+  id               String   @id @default(uuid())
+  schoolId         String   @map("school_id")
+  school           School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  studentId        String   @map("student_id")
+  student          Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  title            String
+  fileName         String   @map("file_name")
+  filePath         String   @map("file_path")
+  mimeType         String   @map("mime_type")
+  fileSize         Int      @map("file_size")
+  uploadedByUserId String?  @map("uploaded_by_user_id")
+  uploadedByUser   User?    @relation(fields: [uploadedByUserId], references: [id], onDelete: SetNull)
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  @@index([schoolId])
+  @@index([studentId])
+  @@map("student_documents")
 }
