@@ -97,6 +97,7 @@ export const en: Dictionary = {
     admissionNumber: 'Admission number',
     withdrawConfirm: 'Withdraw {id}?',
     noGuardian: 'No guardian linked yet',
+    nationality: 'Nationality',
   },
   studentDetail: {
     breadcrumb: 'Students',
@@ -131,6 +132,11 @@ export const en: Dictionary = {
     noGradesYet: 'No grades recorded yet',
     upcomingTasks: 'Upcoming Tasks',
     noUpcomingTasks: 'No upcoming assignments',
+    activityAttendanceLabel: 'Attendance marked: {status}',
+    activityGradeLabel: '{component} grade recorded in {subject}',
+    activitySubmissionLabel: 'Submitted "{title}"',
+    activityNoteLabel: 'Supervisor note added',
+    noActivityYet: 'No activity recorded yet',
   },
   teachers: {
     title: 'Teachers',

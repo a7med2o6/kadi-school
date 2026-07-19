@@ -328,6 +328,7 @@ model Student {
   admissionNumber String        @map("admission_number")
   dateOfBirth     DateTime?     @map("date_of_birth")
   gender          String?
+  nationality     String?
   enrollmentDate  DateTime      @default(now()) @map("enrollment_date")
   status          StudentStatus @default(ACTIVE)
   createdAt       DateTime      @default(now()) @map("created_at")

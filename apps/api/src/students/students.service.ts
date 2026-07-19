@@ -40,6 +40,7 @@ export class StudentsService {
         classId: dto.classId,
         dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : undefined,
         gender: dto.gender,
+        nationality: dto.nationality,
       },
       include: INCLUDE,
     });

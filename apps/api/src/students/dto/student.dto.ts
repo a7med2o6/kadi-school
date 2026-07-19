@@ -31,6 +31,10 @@ export class CreateStudentDto {
   @IsOptional()
   @IsIn(GENDERS)
   gender?: (typeof GENDERS)[number];
+
+  @IsOptional()
+  @IsString()
+  nationality?: string;
 }
 
 export class UpdateStudentDto {

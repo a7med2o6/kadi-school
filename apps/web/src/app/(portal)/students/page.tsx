@@ -38,6 +38,7 @@ const studentSchema = z.object({
   password: z.string().min(8, 'At least 8 characters'),
   admissionNumber: z.string().min(1, 'Required'),
   classId: z.string().optional(),
+  nationality: z.string().optional(),
 });
 type StudentInput = z.infer<typeof studentSchema>;
 
@@ -225,6 +226,10 @@ export default function StudentsPage() {
                 </option>
               ))}
             </select>
+          </FormField>
+
+          <FormField label={`${t.students.nationality} (${t.common.optional})`} htmlFor="nationality">
+            <input id="nationality" className={inputClass} {...register('nationality')} />
           </FormField>
 
           {serverError && <p className="mb-md text-sm text-destructive">{serverError}</p>}

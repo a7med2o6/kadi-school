@@ -96,6 +96,7 @@ export interface Dictionary {
     admissionNumber: string;
     withdrawConfirm: string;
     noGuardian: string;
+    nationality: string;
   };
   studentDetail: {
     breadcrumb: string;
@@ -130,6 +131,11 @@ export interface Dictionary {
     noGradesYet: string;
     upcomingTasks: string;
     noUpcomingTasks: string;
+    activityAttendanceLabel: string;
+    activityGradeLabel: string;
+    activitySubmissionLabel: string;
+    activityNoteLabel: string;
+    noActivityYet: string;
   };
   teachers: {
     title: string;

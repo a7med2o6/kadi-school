@@ -4,7 +4,18 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChevronRight, Download, FileText, GraduationCap, Printer, ReceiptText, TrendingUp } from 'lucide-react';
+import {
+  CalendarCheck,
+  ChevronRight,
+  ClipboardCheck,
+  Download,
+  FileText,
+  GraduationCap,
+  MessageSquare,
+  Printer,
+  ReceiptText,
+  TrendingUp,
+} from 'lucide-react';
 import { apiClient, ApiError } from '@/lib/api-client';
 import { useTranslations } from '@/lib/i18n/use-translations';
 import { interpolate } from '@/lib/i18n';
@@ -22,6 +33,7 @@ interface StudentDetail {
   status: string;
   dateOfBirth: string | null;
   gender: string | null;
+  nationality: string | null;
   enrollmentDate: string;
   class: { id: string; name: string } | null;
   user: { email: string | null; civilId: string | null; phone: string | null };
@@ -73,6 +85,21 @@ const STATUS_DOT: Record<AttendanceStatusValue, string> = {
   EXCUSED: 'bg-secondary/15 text-secondary',
 };
 
+type ActivityType = 'enrollment' | 'attendance' | 'grade' | 'submission' | 'note';
+interface ActivityEvent {
+  id: string;
+  date: string;
+  type: ActivityType;
+  label: string;
+}
+const ACTIVITY_ICON: Record<ActivityType, typeof TrendingUp> = {
+  enrollment: GraduationCap,
+  attendance: CalendarCheck,
+  grade: TrendingUp,
+  submission: ClipboardCheck,
+  note: MessageSquare,
+};
+
 function initials(label: string) {
   return label
     .split(/[\s@.]+/)
@@ -122,6 +149,16 @@ export default function StudentDetailPage() {
   const assignmentsQuery = useQuery({
     queryKey: ['assignments'],
     queryFn: () => apiClient.get<Assignment[]>('/assignments'),
+  });
+  const allAttendanceQuery = useQuery({
+    queryKey: ['attendance-students-all', params.id],
+    queryFn: () => apiClient.get<AttendanceRecord[]>(`/attendance/students?studentId=${params.id}`),
+    enabled: !!params.id,
+  });
+  const allGradesQuery = useQuery({
+    queryKey: ['grades', 'all', params.id],
+    queryFn: () => apiClient.get<StudentGradeRow[]>(`/grades?studentId=${params.id}`),
+    enabled: !!params.id,
   });
 
   const addNoteMutation = useMutation({
@@ -178,6 +215,55 @@ export default function StudentDetailPage() {
     .filter((a) => !a.submissions.some((s) => s.studentId === student.id && s.submittedAt))
     .sort((a, b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime())
     .slice(0, 3);
+
+  const GRADE_LABEL_KEY: Record<GradeComponent, 'quizzes' | 'midterm' | 'final' | 'participation'> = {
+    QUIZZES: 'quizzes',
+    MIDTERM: 'midterm',
+    FINAL: 'final',
+    PARTICIPATION: 'participation',
+  };
+
+  const activityEvents: ActivityEvent[] = [
+    {
+      id: 'enrollment',
+      date: student.enrollmentDate,
+      type: 'enrollment' as const,
+      label: student.class
+        ? interpolate(t.studentDetail.enrolledInClass, { class: student.class.name })
+        : t.studentDetail.enrolled,
+    },
+    ...(allAttendanceQuery.data ?? []).map((r) => ({
+      id: `att-${r.id}`,
+      date: r.date,
+      type: 'attendance' as const,
+      label: interpolate(t.studentDetail.activityAttendanceLabel, { status: t.attendanceStatus[r.status] }),
+    })),
+    ...(allGradesQuery.data ?? []).map((g) => ({
+      id: `grade-${g.id}`,
+      date: g.updatedAt,
+      type: 'grade' as const,
+      label: interpolate(t.studentDetail.activityGradeLabel, {
+        component: t.grades[GRADE_LABEL_KEY[g.component]],
+        subject: g.classSubject.subject.name,
+      }),
+    })),
+    ...(assignmentsQuery.data ?? [])
+      .flatMap((a) => a.submissions.filter((s) => s.studentId === student.id && s.submittedAt).map((s) => ({ a, s })))
+      .map(({ a, s }) => ({
+        id: `sub-${a.id}`,
+        date: s.submittedAt as string,
+        type: 'submission' as const,
+        label: interpolate(t.studentDetail.activitySubmissionLabel, { title: a.title }),
+      })),
+    ...(notesQuery.data ?? []).map((n) => ({
+      id: `note-${n.id}`,
+      date: n.createdAt,
+      type: 'note' as const,
+      label: t.studentDetail.activityNoteLabel,
+    })),
+  ]
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .slice(0, 8);
 
   const label = student.user.email ?? student.user.civilId ?? student.admissionNumber;
   const primaryGuardian = student.guardians.find((g) => g.isPrimaryContact) ?? student.guardians[0];
@@ -265,6 +351,10 @@ export default function StudentDetailPage() {
                   <dd className="font-medium capitalize text-foreground">{student.gender ?? '—'}</dd>
                 </div>
                 <div className="flex justify-between">
+                  <dt className="text-muted-foreground">{t.students.nationality}</dt>
+                  <dd className="font-medium text-foreground">{student.nationality ?? '—'}</dd>
+                </div>
+                <div className="flex justify-between">
                   <dt className="text-muted-foreground">{t.students.civilId}</dt>
                   <dd className="font-medium text-foreground">{student.user.civilId ?? '—'}</dd>
                 </div>
@@ -344,19 +434,26 @@ export default function StudentDetailPage() {
               <h2 className="mb-md text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                 {t.studentDetail.activityTimeline}
               </h2>
-              <div className="flex items-start gap-sm text-sm">
-                <span className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-primary" />
-                <div>
-                  <p className="text-foreground">
-                    {student.class
-                      ? interpolate(t.studentDetail.enrolledInClass, { class: student.class.name })
-                      : t.studentDetail.enrolled}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {new Date(student.enrollmentDate).toLocaleDateString(dateLocale)}
-                  </p>
-                </div>
-              </div>
+              {activityEvents.length === 0 ? (
+                <p className="text-sm text-muted-foreground">{t.studentDetail.noActivityYet}</p>
+              ) : (
+                <ul className="space-y-md">
+                  {activityEvents.map((ev) => {
+                    const Icon = ACTIVITY_ICON[ev.type];
+                    return (
+                      <li key={ev.id} className="flex items-start gap-sm text-sm">
+                        <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                          <Icon className="h-3.5 w-3.5" />
+                        </span>
+                        <div>
+                          <p className="text-foreground">{ev.label}</p>
+                          <p className="text-xs text-muted-foreground">{new Date(ev.date).toLocaleDateString(dateLocale)}</p>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
             </div>
           </div>
         </div>

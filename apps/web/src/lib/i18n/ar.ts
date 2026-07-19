@@ -96,6 +96,7 @@ export const ar: Dictionary = {
     admissionNumber: 'رقم القيد',
     withdrawConfirm: 'سحب قيد {id}؟',
     noGuardian: 'لم يتم ربط ولي أمر بعد',
+    nationality: 'الجنسية',
   },
   studentDetail: {
     breadcrumb: 'الطلاب',
@@ -130,6 +131,11 @@ export const ar: Dictionary = {
     noGradesYet: 'لا توجد درجات مسجلة بعد',
     upcomingTasks: 'المهام القادمة',
     noUpcomingTasks: 'لا توجد مهام قادمة',
+    activityAttendanceLabel: 'تسجيل حضور: {status}',
+    activityGradeLabel: 'تم رصد درجة {component} في {subject}',
+    activitySubmissionLabel: 'تم تسليم "{title}"',
+    activityNoteLabel: 'أُضيفت ملاحظة من المشرف',
+    noActivityYet: 'لا يوجد نشاط مسجل بعد',
   },
   teachers: {
     title: 'المعلمون',
