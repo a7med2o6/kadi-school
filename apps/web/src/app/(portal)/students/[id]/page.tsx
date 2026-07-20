@@ -54,14 +54,22 @@ interface SchoolClass {
   name: string;
 }
 
-type FeeStatus = 'PENDING' | 'PAID' | 'OVERDUE';
+type FeeStatus = 'PENDING' | 'PARTIAL' | 'PAID' | 'OVERDUE';
+type PaymentMethod = 'CASH' | 'BANK_TRANSFER' | 'CARD' | 'OTHER';
+interface InvoicePayment {
+  id: string;
+  amount: string;
+  method: PaymentMethod;
+  paidAt: string;
+  referenceNumber: string | null;
+}
 interface FeeInvoice {
   id: string;
   title: string;
-  amount: string;
+  amountDue: string;
   dueDate: string;
   status: FeeStatus;
-  paidAt: string | null;
+  payments: InvoicePayment[];
 }
 interface StudentDocumentRow {
   id: string;
@@ -84,10 +92,17 @@ type EditProfileInput = z.infer<typeof editProfileSchema>;
 
 const feeInvoiceSchema = z.object({
   title: z.string().min(1, 'Required'),
-  amount: z.coerce.number().positive('Must be positive'),
+  amountDue: z.coerce.number().positive('Must be positive'),
   dueDate: z.string().min(1, 'Required'),
 });
 type FeeInvoiceInput = z.infer<typeof feeInvoiceSchema>;
+
+const paymentSchema = z.object({
+  amount: z.coerce.number().positive('Must be positive'),
+  method: z.enum(['CASH', 'BANK_TRANSFER', 'CARD', 'OTHER']),
+  referenceNumber: z.string().optional(),
+});
+type PaymentInput = z.infer<typeof paymentSchema>;
 
 const documentSchema = z.object({
   title: z.string().min(1, 'Required'),
@@ -185,6 +200,7 @@ export default function StudentDetailPage() {
   const [noteBody, setNoteBody] = useState('');
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [feeDialogOpen, setFeeDialogOpen] = useState(false);
+  const [payInvoiceId, setPayInvoiceId] = useState<string | null>(null);
   const [docDialogOpen, setDocDialogOpen] = useState(false);
   const [docFile, setDocFile] = useState<File | null>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
@@ -195,6 +211,7 @@ export default function StudentDetailPage() {
   const canEditProfile = hasPermission('students:write');
   const canViewFees = hasPermission('finance:read');
   const canManageFees = hasPermission('finance:write');
+  const canRecordPayment = hasPermission('payments:create');
   const canViewDocuments = hasPermission('documents:read');
   const canManageDocuments = hasPermission('documents:write');
   const canViewExams = hasPermission('exams:read');
@@ -214,8 +231,8 @@ export default function StudentDetailPage() {
     enabled: canEditProfile,
   });
   const feesQuery = useQuery({
-    queryKey: ['fees', params.id],
-    queryFn: () => apiClient.get<FeeInvoice[]>(`/fees?studentId=${params.id}`),
+    queryKey: ['invoices', params.id],
+    queryFn: () => apiClient.get<FeeInvoice[]>(`/invoices?studentId=${params.id}`),
     enabled: !!params.id && canViewFees,
   });
   const documentsQuery = useQuery({
@@ -282,6 +299,13 @@ export default function StudentDetailPage() {
   } = useForm<FeeInvoiceInput>({ resolver: zodResolver(feeInvoiceSchema) });
 
   const {
+    register: registerPayment,
+    handleSubmit: handlePaymentSubmit,
+    reset: resetPaymentForm,
+    formState: { errors: paymentErrors },
+  } = useForm<PaymentInput>({ resolver: zodResolver(paymentSchema), defaultValues: { method: 'CASH' } });
+
+  const {
     register: registerDoc,
     handleSubmit: handleDocSubmit,
     reset: resetDocForm,
@@ -313,16 +337,21 @@ export default function StudentDetailPage() {
   });
 
   const createInvoiceMutation = useMutation({
-    mutationFn: (data: FeeInvoiceInput) => apiClient.post('/fees', { studentId: params.id, ...data }),
+    mutationFn: (data: FeeInvoiceInput) => apiClient.post('/invoices', { studentId: params.id, ...data }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['fees', params.id] });
+      queryClient.invalidateQueries({ queryKey: ['invoices', params.id] });
       setFeeDialogOpen(false);
     },
   });
 
-  const markPaidMutation = useMutation({
-    mutationFn: (id: string) => apiClient.patch(`/fees/${id}/pay`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['fees', params.id] }),
+  const addPaymentMutation = useMutation({
+    mutationFn: ({ invoiceId, data }: { invoiceId: string; data: PaymentInput }) =>
+      apiClient.post(`/invoices/${invoiceId}/payments`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invoices', params.id] });
+      setPayInvoiceId(null);
+      resetPaymentForm({ amount: undefined, method: 'CASH', referenceNumber: '' });
+    },
   });
 
   const uploadDocMutation = useMutation({
@@ -460,17 +489,29 @@ export default function StudentDetailPage() {
 
   const apiOrigin = getApiOrigin();
   const feeInvoices = feesQuery.data ?? [];
-  const totalDue = feeInvoices.filter((f) => f.status !== 'PAID').reduce((sum, f) => sum + parseFloat(f.amount), 0);
-  const totalPaid = feeInvoices.filter((f) => f.status === 'PAID').reduce((sum, f) => sum + parseFloat(f.amount), 0);
+  const invoicePaidTotal = (f: FeeInvoice) => f.payments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
+  const totalDue = feeInvoices
+    .filter((f) => f.status !== 'PAID')
+    .reduce((sum, f) => sum + (parseFloat(f.amountDue) - invoicePaidTotal(f)), 0);
+  const totalPaid = feeInvoices.reduce((sum, f) => sum + invoicePaidTotal(f), 0);
   const FEE_STATUS_BADGE: Record<FeeStatus, string> = {
     PENDING: 'bg-tertiary/10 text-tertiary',
+    PARTIAL: 'bg-primary/10 text-primary',
     PAID: 'bg-success/10 text-success',
     OVERDUE: 'bg-destructive/10 text-destructive',
   };
   const FEE_STATUS_LABEL: Record<FeeStatus, string> = {
     PENDING: t.studentDetail.feesStatusPending,
+    PARTIAL: t.studentDetail.feesStatusPartial,
     PAID: t.studentDetail.feesStatusPaid,
     OVERDUE: t.studentDetail.feesStatusOverdue,
+  };
+  const payingInvoice = feeInvoices.find((f) => f.id === payInvoiceId) ?? null;
+  const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = {
+    CASH: t.finance.methodCash,
+    BANK_TRANSFER: t.finance.methodBankTransfer,
+    CARD: t.finance.methodCard,
+    OTHER: t.finance.methodOther,
   };
 
   return (
@@ -1094,7 +1135,7 @@ export default function StudentDetailPage() {
                   <button
                     type="button"
                     onClick={() => {
-                      resetFeeForm({ title: '', amount: undefined, dueDate: '' });
+                      resetFeeForm({ title: '', amountDue: undefined, dueDate: '' });
                       setFeeDialogOpen(true);
                     }}
                     className="inline-flex cursor-pointer items-center gap-1 rounded bg-primary px-md py-sm text-sm font-medium text-primary-foreground transition-colors hover:opacity-90"
@@ -1122,9 +1163,7 @@ export default function StudentDetailPage() {
                           <th className="whitespace-nowrap px-md py-sm text-start font-medium">
                             {t.studentDetail.feesDueDateLabel}
                           </th>
-                          <th className="whitespace-nowrap px-md py-sm text-start font-medium">
-                            {t.attendanceRegister.status}
-                          </th>
+                          <th className="whitespace-nowrap px-md py-sm text-start font-medium">{t.users.status}</th>
                           <th className="whitespace-nowrap px-md py-sm text-start font-medium">{t.common.actions}</th>
                         </tr>
                       </thead>
@@ -1133,7 +1172,7 @@ export default function StudentDetailPage() {
                           <tr key={f.id} className="border-b border-border last:border-0">
                             <td className="whitespace-nowrap px-md py-sm font-medium text-foreground">{f.title}</td>
                             <td className="whitespace-nowrap px-md py-sm text-foreground" dir="ltr">
-                              {parseFloat(f.amount).toFixed(2)}
+                              {parseFloat(f.amountDue).toFixed(2)}
                             </td>
                             <td className="whitespace-nowrap px-md py-sm text-foreground" dir="ltr">
                               {new Date(f.dueDate).toLocaleDateString(dateLocale)}
@@ -1144,14 +1183,16 @@ export default function StudentDetailPage() {
                               </span>
                             </td>
                             <td className="whitespace-nowrap px-md py-sm">
-                              {canManageFees && f.status !== 'PAID' && (
+                              {(canManageFees || canRecordPayment) && f.status !== 'PAID' && (
                                 <button
                                   type="button"
-                                  onClick={() => markPaidMutation.mutate(f.id)}
-                                  disabled={markPaidMutation.isPending}
-                                  className="cursor-pointer rounded border border-border px-sm py-1 text-xs font-medium text-foreground transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
+                                  onClick={() => {
+                                    resetPaymentForm({ amount: undefined, method: 'CASH', referenceNumber: '' });
+                                    setPayInvoiceId(f.id);
+                                  }}
+                                  className="cursor-pointer rounded border border-border px-sm py-1 text-xs font-medium text-foreground transition-colors hover:bg-accent"
                                 >
-                                  {t.studentDetail.feesMarkPaid}
+                                  {t.studentDetail.feesRecordPayment}
                                 </button>
                               )}
                             </td>
@@ -1302,8 +1343,8 @@ export default function StudentDetailPage() {
           <FormField label={t.studentDetail.feesInvoiceTitleLabel} htmlFor="feeTitle" error={feeErrors.title?.message}>
             <input id="feeTitle" className={inputClass} {...registerFee('title')} />
           </FormField>
-          <FormField label={t.studentDetail.feesAmountLabel} htmlFor="feeAmount" error={feeErrors.amount?.message}>
-            <input id="feeAmount" type="number" step="0.01" className={inputClass} dir="ltr" {...registerFee('amount')} />
+          <FormField label={t.studentDetail.feesAmountLabel} htmlFor="feeAmount" error={feeErrors.amountDue?.message}>
+            <input id="feeAmount" type="number" step="0.01" className={inputClass} dir="ltr" {...registerFee('amountDue')} />
           </FormField>
           <FormField label={t.studentDetail.feesDueDateLabel} htmlFor="feeDueDate" error={feeErrors.dueDate?.message}>
             <input id="feeDueDate" type="date" className={inputClass} dir="ltr" {...registerFee('dueDate')} />
@@ -1321,6 +1362,74 @@ export default function StudentDetailPage() {
             {createInvoiceMutation.isPending ? t.common.creating : t.common.create}
           </button>
         </form>
+      </Dialog>
+
+      <Dialog open={!!payInvoiceId} onClose={() => setPayInvoiceId(null)} title={t.studentDetail.feesRecordPayment}>
+        {payingInvoice && (
+          <>
+            <div className="mb-md rounded-md bg-muted p-sm">
+              <div className="text-sm font-medium text-foreground">{payingInvoice.title}</div>
+              <div className="text-xs text-muted-foreground">{t.studentDetail.feesPaymentHistory}</div>
+              {payingInvoice.payments.length === 0 ? (
+                <p className="mt-1 text-xs text-muted-foreground">{t.studentDetail.feesNoPaymentsYet}</p>
+              ) : (
+                <ul className="mt-1 space-y-1">
+                  {payingInvoice.payments.map((p) => (
+                    <li key={p.id} className="flex items-center justify-between text-xs text-foreground">
+                      <span>
+                        {PAYMENT_METHOD_LABEL[p.method]} · {new Date(p.paidAt).toLocaleDateString(dateLocale)}
+                      </span>
+                      <span dir="ltr">{parseFloat(p.amount).toFixed(2)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <form
+              onSubmit={handlePaymentSubmit((data) => {
+                addPaymentMutation.mutate({ invoiceId: payingInvoice.id, data });
+              })}
+            >
+              <FormField
+                label={t.finance.paymentAmountLabel}
+                htmlFor="paymentAmount"
+                error={paymentErrors.amount?.message}
+              >
+                <input
+                  id="paymentAmount"
+                  type="number"
+                  step="0.01"
+                  className={inputClass}
+                  dir="ltr"
+                  {...registerPayment('amount')}
+                />
+              </FormField>
+              <FormField label={t.finance.paymentMethodLabel} htmlFor="paymentMethod">
+                <select id="paymentMethod" className={inputClass} {...registerPayment('method')}>
+                  <option value="CASH">{t.finance.methodCash}</option>
+                  <option value="BANK_TRANSFER">{t.finance.methodBankTransfer}</option>
+                  <option value="CARD">{t.finance.methodCard}</option>
+                  <option value="OTHER">{t.finance.methodOther}</option>
+                </select>
+              </FormField>
+              <FormField label={t.finance.referenceNumberLabel} htmlFor="paymentReference">
+                <input id="paymentReference" className={inputClass} {...registerPayment('referenceNumber')} />
+              </FormField>
+              {addPaymentMutation.isError && (
+                <p className="mb-md text-sm text-destructive">
+                  {addPaymentMutation.error instanceof ApiError ? addPaymentMutation.error.message : 'Something went wrong'}
+                </p>
+              )}
+              <button
+                type="submit"
+                disabled={addPaymentMutation.isPending}
+                className="w-full cursor-pointer rounded bg-primary px-md py-sm text-sm font-medium text-primary-foreground transition-colors hover:opacity-90 disabled:opacity-60"
+              >
+                {addPaymentMutation.isPending ? t.common.creating : t.finance.recordPayment}
+              </button>
+            </form>
+          </>
+        )}
       </Dialog>
 
       <Dialog open={docDialogOpen} onClose={() => setDocDialogOpen(false)} title={t.studentDetail.documentsUploadTitle}>

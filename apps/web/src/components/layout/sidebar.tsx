@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import {
+  Banknote,
   Bell,
   CalendarCheck,
   CalendarDays,
@@ -18,6 +19,7 @@ import {
   UsersRound,
   BookOpen,
   Users,
+  Wallet,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { useAuthStore } from '@/stores/auth-store';
@@ -42,6 +44,8 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/timetable', labelKey: 'timetable', icon: CalendarDays, permission: 'timetable:read' },
   { href: '/teachers', labelKey: 'teachers', icon: GraduationCap, permission: 'teachers:read' },
   { href: '/students', labelKey: 'students', icon: UsersRound, permission: 'students:read' },
+  { href: '/finance', labelKey: 'finance', icon: Wallet, permission: 'finance:read' },
+  { href: '/payroll', labelKey: 'payroll', icon: Banknote, permission: 'payroll:read' },
   { href: '/users', labelKey: 'users', icon: Users, permission: 'users:read' },
 ];
 

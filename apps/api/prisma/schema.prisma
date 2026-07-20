@@ -58,8 +58,12 @@ model School {
   examQuestions          ExamQuestion[]
   notifications          Notification[]
   notificationRecipients NotificationRecipient[]
-  feeInvoices            FeeInvoice[]
   studentDocuments       StudentDocument[]
+  feeStructures          FeeStructure[]
+  invoices               Invoice[]
+  payments               Payment[]
+  payrollStructures      PayrollStructure[]
+  payslips               Payslip[]
 
   @@map("schools")
 }
@@ -90,6 +94,7 @@ model User {
   notificationsTargeted   Notification[]           @relation("NotificationTargetUser")
   notificationRecipient   NotificationRecipient[]
   documentsUploaded       StudentDocument[]
+  paymentsRecorded        Payment[]
 
   @@unique([schoolId, email])
   @@unique([schoolId, civilId])
@@ -189,7 +194,8 @@ model AcademicYear {
   isCurrent Boolean  @default(false) @map("is_current")
   createdAt DateTime @default(now()) @map("created_at")
 
-  classes Class[]
+  classes       Class[]
+  feeStructures FeeStructure[]
 
   @@index([schoolId])
   @@map("academic_years")
@@ -227,6 +233,7 @@ model Class {
   attendanceRecords StudentAttendance[]
   exams             Exam[]
   notifications     Notification[]
+  feeStructures     FeeStructure[]
 
   @@index([schoolId])
   @@index([academicYearId])
@@ -306,6 +313,7 @@ model Teacher {
   classSubjects   ClassSubject[]
   leaveRequests      TeacherLeaveRequest[]
   attendanceRecords  TeacherAttendance[]
+  payrollStructures  PayrollStructure[]
 
   @@unique([schoolId, employeeNumber])
   @@index([schoolId])
@@ -343,8 +351,8 @@ model Student {
   attendanceNotes   StudentAttendanceNote[]
   grades            StudentGrade[]
   submissions       AssignmentSubmission[]
-  feeInvoices       FeeInvoice[]
   documents         StudentDocument[]
+  invoices          Invoice[]
 
   @@unique([schoolId, admissionNumber])
   @@index([schoolId])
@@ -684,31 +692,142 @@ model NotificationRecipient {
   @@map("notification_recipients")
 }
 
-enum FeeInvoiceStatus {
+enum FeeFrequency {
+  MONTHLY
+  TERM
+  ANNUAL
+
+  @@map("fee_frequency")
+}
+
+enum InvoiceStatus {
   PENDING
+  PARTIAL
   PAID
   OVERDUE
 
-  @@map("fee_invoice_status")
+  @@map("invoice_status")
 }
 
-/// Tenant-scoped.
-model FeeInvoice {
-  id        String           @id @default(uuid())
-  schoolId  String           @map("school_id")
-  school    School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  studentId String           @map("student_id")
-  student   Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  title     String
-  amount    Decimal          @db.Decimal(10, 2)
-  dueDate   DateTime         @map("due_date")
-  status    FeeInvoiceStatus @default(PENDING)
-  paidAt    DateTime?        @map("paid_at")
-  createdAt DateTime         @default(now()) @map("created_at")
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  CARD
+  OTHER
+
+  @@map("payment_method")
+}
+
+enum PayslipStatus {
+  DRAFT
+  FINALIZED
+  PAID
+
+  @@map("payslip_status")
+}
+
+/// Tenant-scoped. A fee template a school can bill against (e.g. "Term 1 Tuition").
+/// classId null = applies school-wide; set = only that class.
+model FeeStructure {
+  id             String        @id @default(uuid())
+  schoolId       String        @map("school_id")
+  school         School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  name           String
+  classId        String?       @map("class_id")
+  class          Class?        @relation(fields: [classId], references: [id], onDelete: SetNull)
+  amount         Decimal       @db.Decimal(10, 2)
+  frequency      FeeFrequency
+  academicYearId String?       @map("academic_year_id")
+  academicYear   AcademicYear? @relation(fields: [academicYearId], references: [id], onDelete: SetNull)
+  createdAt      DateTime      @default(now()) @map("created_at")
+
+  invoices Invoice[]
 
   @@index([schoolId])
-  @@index([studentId])
-  @@map("fee_invoices")
+  @@map("fee_structures")
+}
+
+/// Tenant-scoped. A billed amount owed by one student; `status` is
+/// recalculated from the sum of its payments every time one is recorded.
+model Invoice {
+  id             String        @id @default(uuid())
+  schoolId       String        @map("school_id")
+  school         School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  studentId      String        @map("student_id")
+  student        Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  feeStructureId String?       @map("fee_structure_id")
+  feeStructure   FeeStructure? @relation(fields: [feeStructureId], references: [id], onDelete: SetNull)
+  title          String
+  amountDue      Decimal       @db.Decimal(10, 2) @map("amount_due")
+  dueDate        DateTime      @map("due_date")
+  status         InvoiceStatus @default(PENDING)
+  createdAt      DateTime      @default(now()) @map("created_at")
+
+  payments Payment[]
+
+  @@index([schoolId, studentId, status])
+  @@map("invoices")
+}
+
+/// Tenant-scoped. Payments are additive against an invoice — a full invoice
+/// amount can be settled by one or several partial payments.
+model Payment {
+  id               String        @id @default(uuid())
+  schoolId         String        @map("school_id")
+  school           School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  invoiceId        String        @map("invoice_id")
+  invoice          Invoice       @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  amount           Decimal       @db.Decimal(10, 2)
+  method           PaymentMethod
+  paidAt           DateTime      @default(now()) @map("paid_at")
+  recordedByUserId String?       @map("recorded_by_user_id")
+  recordedByUser   User?         @relation(fields: [recordedByUserId], references: [id], onDelete: SetNull)
+  referenceNumber  String?       @map("reference_number")
+  createdAt        DateTime      @default(now()) @map("created_at")
+
+  @@index([schoolId])
+  @@index([invoiceId])
+  @@map("payments")
+}
+
+/// Tenant-scoped. One active salary structure per teacher; `allowances`/`deductions`
+/// are open-ended jsonb maps (e.g. {"housing": 100}) so schools can add line items
+/// without a schema change.
+model PayrollStructure {
+  id            String    @id @default(uuid())
+  schoolId      String    @map("school_id")
+  school        School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  teacherId     String    @map("teacher_id")
+  teacher       Teacher   @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  baseSalary    Decimal   @db.Decimal(10, 2) @map("base_salary")
+  allowances    Json      @default("{}")
+  deductions    Json      @default("{}")
+  effectiveFrom DateTime  @map("effective_from")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  payslips Payslip[]
+
+  @@index([schoolId])
+  @@map("payroll_structures")
+}
+
+/// Tenant-scoped. One payslip per (payroll structure, period) — generation is
+/// idempotent per month via the unique constraint.
+model Payslip {
+  id                 String           @id @default(uuid())
+  schoolId           String           @map("school_id")
+  school             School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  payrollStructureId String           @map("payroll_structure_id")
+  payrollStructure   PayrollStructure @relation(fields: [payrollStructureId], references: [id], onDelete: Cascade)
+  periodMonth        String           @map("period_month")
+  gross              Decimal          @db.Decimal(10, 2)
+  net                Decimal          @db.Decimal(10, 2)
+  generatedAt        DateTime         @default(now()) @map("generated_at")
+  status             PayslipStatus    @default(DRAFT)
+
+  @@unique([payrollStructureId, periodMonth])
+  @@index([schoolId])
+  @@map("payslips")
 }
 
 /// Tenant-scoped. `filePath` is a server-local path under the uploads root — never exposed directly.

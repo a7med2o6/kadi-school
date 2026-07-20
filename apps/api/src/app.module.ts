@@ -8,12 +8,13 @@ import { AttendanceModule } from './attendance/attendance.module';
 import { CoreModule } from './core/core.module';
 import { DocumentsModule } from './documents/documents.module';
 import { ExamsModule } from './exams/exams.module';
-import { FeesModule } from './fees/fees.module';
+import { FinanceModule } from './finance/finance.module';
 import { FilesModule } from './files/files.module';
 import { GradesModule } from './grades/grades.module';
 import { IamModule } from './iam/iam.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ParentsModule } from './parents/parents.module';
+import { PayrollModule } from './payroll/payroll.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { StudentsModule } from './students/students.module';
 import { SubjectsModule } from './subjects/subjects.module';
@@ -44,7 +45,8 @@ import { TimetableModule } from './timetable/timetable.module';
     ExamsModule,
     NotificationsModule,
     FilesModule,
-    FeesModule,
+    FinanceModule,
+    PayrollModule,
     DocumentsModule,
   ],
   controllers: [AppController],
