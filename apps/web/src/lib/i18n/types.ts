@@ -49,6 +49,7 @@ export interface Dictionary {
     myProfile: string;
     finance: string;
     payroll: string;
+    reports: string;
   };
   auth: {
     welcomeBack: string;
@@ -85,6 +86,7 @@ export interface Dictionary {
     noActivity: string;
     enrolledText: string;
     joinedText: string;
+    financialSummary: string;
   };
   students: {
     title: string;
@@ -236,6 +238,41 @@ export interface Dictionary {
     noPayslipsYet: string;
     markFinalized: string;
     markPaid: string;
+  };
+  reports: {
+    title: string;
+    subtitle: string;
+    tabAttendance: string;
+    tabAcademic: string;
+    tabFinancial: string;
+    filterFrom: string;
+    filterTo: string;
+    filterClass: string;
+    filterTerm: string;
+    allClasses: string;
+    exportCsv: string;
+    print: string;
+    totalRecords: string;
+    attendanceRate: string;
+    classBreakdown: string;
+    classCol: string;
+    rateCol: string;
+    dateCol: string;
+    admissionNumberCol: string;
+    studentCol: string;
+    statusCol: string;
+    schoolAverage: string;
+    studentCount: string;
+    subjectBreakdown: string;
+    subjectCol: string;
+    termCol: string;
+    totalCol: string;
+    invoiceTitleCol: string;
+    amountDueCol: string;
+    paidCol: string;
+    dueDateCol: string;
+    noDataYet: string;
+    noAccessToAnyReport: string;
   };
   teachers: {
     title: string;

@@ -43,6 +43,7 @@ const PERMISSIONS = [
   { key: 'documents:write', module: 'documents', description: 'Upload/manage student documents' },
   { key: 'payroll:read', module: 'payroll', description: 'View payroll' },
   { key: 'payroll:write', module: 'payroll', description: 'Manage payroll' },
+  { key: 'reports:read', module: 'reports', description: 'View cross-module reports (attendance, academic, financial)' },
 ] as const;
 
 const ALL_KEYS = PERMISSIONS.map((p) => p.key);
@@ -95,8 +96,8 @@ const DEFAULT_ROLES: { name: string; permissions: readonly string[] }[] = [
       'documents:read',
     ],
   },
-  { name: 'HR', permissions: ['users:read', 'teachers:read', 'teachers:write', 'payroll:write'] },
-  { name: 'Accountant', permissions: ['finance:write', 'payroll:read'] },
+  { name: 'HR', permissions: ['users:read', 'teachers:read', 'teachers:write', 'payroll:read', 'payroll:write'] },
+  { name: 'Accountant', permissions: ['finance:read', 'finance:write', 'payroll:read', 'reports:read'] },
   {
     name: 'Reception',
     permissions: ['users:read', 'students:read', 'students:write', 'parents:read', 'parents:write', 'notifications:write'],

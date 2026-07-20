@@ -16,6 +16,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { ParentsModule } from './parents/parents.module';
 import { PayrollModule } from './payroll/payroll.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { ReportsModule } from './reports/reports.module';
 import { StudentsModule } from './students/students.module';
 import { SubjectsModule } from './subjects/subjects.module';
 import { SuperAdminModule } from './super-admin/super-admin.module';
@@ -48,6 +49,7 @@ import { TimetableModule } from './timetable/timetable.module';
     FinanceModule,
     PayrollModule,
     DocumentsModule,
+    ReportsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -5,7 +5,6 @@ import { useQuery } from '@tanstack/react-query';
 import {
   BarChart3,
   BookOpen,
-  CalendarClock,
   CalendarPlus,
   GraduationCap,
   Plus,
@@ -36,6 +35,12 @@ interface SchoolClass {
 }
 interface Subject {
   id: string;
+}
+interface AcademicReport {
+  subjectBreakdown: { subjectName: string; average: number }[];
+}
+interface FinancialReport {
+  summary: { totalOutstanding: number; totalCollected: number };
 }
 
 const STAT_ICON_STYLES = [
@@ -68,10 +73,23 @@ export default function DashboardPage() {
     return rtf.format(-Math.round(hours / 24), 'day');
   }
 
+  const canViewGrades = hasPermission('grades:read');
+  const canViewFinance = hasPermission('finance:read');
+
   const studentsQuery = useQuery({ queryKey: ['students'], queryFn: () => apiClient.get<Student[]>('/students') });
   const teachersQuery = useQuery({ queryKey: ['teachers'], queryFn: () => apiClient.get<Teacher[]>('/teachers') });
   const classesQuery = useQuery({ queryKey: ['classes'], queryFn: () => apiClient.get<SchoolClass[]>('/classes') });
   const subjectsQuery = useQuery({ queryKey: ['subjects'], queryFn: () => apiClient.get<Subject[]>('/subjects') });
+  const academicReportQuery = useQuery({
+    queryKey: ['reports', 'academic', 'dashboard'],
+    queryFn: () => apiClient.get<AcademicReport>('/reports/academic?term=1'),
+    enabled: canViewGrades,
+  });
+  const financialReportQuery = useQuery({
+    queryKey: ['reports', 'financial', 'dashboard'],
+    queryFn: () => apiClient.get<FinancialReport>('/reports/financial'),
+    enabled: canViewFinance,
+  });
 
   const stats = [
     { label: t.dashboard.totalStudents, value: studentsQuery.data?.length, icon: GraduationCap },
@@ -86,6 +104,9 @@ export default function DashboardPage() {
     return acc;
   }, {});
   const maxClassCount = Math.max(1, ...Object.values(studentsByClass));
+
+  const subjectBreakdown = academicReportQuery.data?.subjectBreakdown ?? [];
+  const maxSubjectAverage = Math.max(1, ...subjectBreakdown.map((s) => s.average));
 
   const recentActivity = [
     ...(studentsQuery.data ?? []).map((s) => ({
@@ -166,15 +187,58 @@ export default function DashboardPage() {
           )}
         </div>
 
-        <div className="rounded-lg border border-border bg-card p-lg shadow-ambient">
-          <h2 className="text-lg font-bold text-foreground">{t.dashboard.gradeDistribution}</h2>
-          <p className="mb-lg text-sm text-muted-foreground">{t.dashboard.weeklyOverview}</p>
-          <div className="flex h-40 flex-col items-center justify-center text-center text-muted-foreground">
-            <CalendarClock className="mb-2 h-8 w-8" />
-            <p className="text-sm">{t.dashboard.gradesPlaceholder}</p>
+        {canViewGrades && (
+          <div className="rounded-lg border border-border bg-card p-lg shadow-ambient">
+            <h2 className="text-lg font-bold text-foreground">{t.dashboard.gradeDistribution}</h2>
+            <p className="mb-lg text-sm text-muted-foreground">{t.dashboard.weeklyOverview}</p>
+
+            {subjectBreakdown.length === 0 ? (
+              <div className="flex h-40 flex-col items-center justify-center text-center text-muted-foreground">
+                <BarChart3 className="mb-2 h-8 w-8" />
+                <p className="text-sm">{t.dashboard.gradesPlaceholder}</p>
+              </div>
+            ) : (
+              <div className="flex h-40 items-end gap-md">
+                {subjectBreakdown.map((s) => (
+                  <div key={s.subjectName} className="flex flex-1 flex-col items-center gap-2">
+                    <span className="text-xs font-medium text-foreground" dir="ltr">
+                      {s.average}
+                    </span>
+                    <div
+                      className="w-full rounded-t bg-secondary/80"
+                      style={{ height: `${Math.max(8, (s.average / maxSubjectAverage) * 100)}%` }}
+                    />
+                    <span className="text-xs text-muted-foreground">{s.subjectName}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {canViewFinance && (
+        <div className="grid grid-cols-1 gap-lg lg:grid-cols-3">
+          <div className="rounded-lg border border-border bg-card p-lg shadow-ambient lg:col-span-2">
+            <h2 className="text-lg font-bold text-foreground">{t.dashboard.financialSummary}</h2>
+            <p className="mb-lg text-sm text-muted-foreground">{t.finance.subtitle}</p>
+            <div className="grid grid-cols-2 gap-md sm:max-w-md">
+              <div>
+                <div className="text-xs text-muted-foreground">{t.finance.totalOutstanding}</div>
+                <div className="text-2xl font-bold text-foreground" dir="ltr">
+                  {(financialReportQuery.data?.summary.totalOutstanding ?? 0).toFixed(2)}
+                </div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground">{t.finance.totalCollected}</div>
+                <div className="text-2xl font-bold text-success" dir="ltr">
+                  {(financialReportQuery.data?.summary.totalCollected ?? 0).toFixed(2)}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       <div className="grid grid-cols-1 gap-lg lg:grid-cols-3">
         <div className="space-y-md lg:col-span-2">

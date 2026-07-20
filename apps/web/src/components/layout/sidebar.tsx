@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import {
   Banknote,
+  BarChart3,
   Bell,
   CalendarCheck,
   CalendarDays,
@@ -46,6 +47,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/students', labelKey: 'students', icon: UsersRound, permission: 'students:read' },
   { href: '/finance', labelKey: 'finance', icon: Wallet, permission: 'finance:read' },
   { href: '/payroll', labelKey: 'payroll', icon: Banknote, permission: 'payroll:read' },
+  { href: '/reports', labelKey: 'reports', icon: BarChart3, permission: 'reports:read' },
   { href: '/users', labelKey: 'users', icon: Users, permission: 'users:read' },
 ];
 
